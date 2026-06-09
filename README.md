@@ -10,6 +10,12 @@ screenshots, pull waveform data, and read protocol-decode results.
 The name is a nod to SCPI — pronounced *"skippy"* in the test-and-measurement
 world.
 
+![A 1 MHz, 1 Vpp sinc waveform captured live on an MSO5204 via SkippyMCP](docs/media/sinc-capture.png)
+
+*Live capture: an AI assistant configured the channel and trigger, ran the
+acquisition, measured it (Vpp 1.02 V, ~1 MHz), and pulled this screenshot — all
+through SkippyMCP's MCP tools.*
+
 - **Project name:** SkippyMCP
 - **Executable:** `skippy-mcp`
 - **Primary target:** Rigol **MSO5204** (MSO5000 series); a per-series dialect
