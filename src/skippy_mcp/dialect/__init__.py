@@ -1,0 +1,1 @@
+"""SkippyMCP dialect layer."""
