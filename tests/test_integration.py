@@ -12,7 +12,7 @@ from typing import Any
 from mcp import types
 
 from skippy_mcp.driver.session import establish
-from skippy_mcp.mcp.server import build_server
+from skippy_mcp.mcp.server import build_mcp_server
 from skippy_mcp.mcp.tools import build_tool_specs
 from skippy_mcp.transport.simulated import SimulatedTransport
 
@@ -29,7 +29,7 @@ def _call(server: Any, name: str, arguments: dict[str, Any]) -> types.CallToolRe
 
 def _server(*, allow_raw: bool = False) -> Any:
     scope = establish(SimulatedTransport(), reset_on_connect=False)
-    return build_server(scope, build_tool_specs(allow_raw), async_dispatch=False)
+    return build_mcp_server(scope, build_tool_specs(allow_raw))
 
 
 def test_list_tools_reports_nine() -> None:

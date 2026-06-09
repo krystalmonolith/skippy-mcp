@@ -14,8 +14,8 @@ world.
 - **Executable:** `skippy-mcp`
 - **Primary target:** Rigol **MSO5204** (MSO5000 series); a per-series dialect
   layer keeps other Rigol DSO/MSO families addable.
-- **Status:** hardware-free stack complete (driver, dialect, simulator, MCP
-  tools, end-to-end tests). Live-hardware smoke test pending.
+- **Status:** validated live against a real MSO5204; serves MCP over HTTP
+  (Streamable HTTP) with optional Bearer-key auth and TLS.
 
 ## Install
 
@@ -26,30 +26,54 @@ python3 -m venv .venv
 
 ## Run
 
+The server speaks MCP over **HTTP** (Streamable HTTP) at `/mcp`:
+
 ```bash
-skippy-mcp --host 192.168.1.50          # connect over LAN, serve MCP over stdio
-skippy-mcp --resource TCPIP0::scope::INSTR
+skippy-mcp --host 192.168.1.50            # plain HTTP on 0.0.0.0:8080
+skippy-mcp --resource TCPIP0::scope::5555::SOCKET --port 9000
+skippy-mcp --config skippy.json           # API key / TLS / address from JSON
 ```
 
 | Flag | Default | Effect |
 |------|---------|--------|
-| `--host` / `--resource` | — | Instrument address (one required). |
+| `--host` / `--resource` | — | Instrument address (CLI overrides the config file). |
+| `--bind` | `0.0.0.0` | HTTP bind address. |
+| `--port` | `8080` | HTTP port. |
 | `--timeout-ms` | 5000 | VISA I/O timeout. |
-| `--async` | sync | Dispatch tool calls via a thread executor. |
 | `--no-reset` | reset on | Skip `*RST` on connect; leave the setup untouched. |
 | `--allow-raw-scpi` | off | Register the `scpi_raw` escape-hatch tool. |
+| `--config <path>` | none | Optional JSON config (below). |
+
+### Config file (`--config`)
+
+All keys optional. No file → plain HTTP, no auth.
+
+```json
+{
+  "host": "192.168.1.50",
+  "resource": "TCPIP0::192.168.1.50::5555::SOCKET",
+  "api_key": "your-bearer-token",
+  "tls": { "cert": "/path/cert.pem", "key": "/path/key.pem" }
+}
+```
+
+- `api_key` set → require `Authorization: Bearer <key>` on every request.
+- `tls` set → serve HTTPS directly (no reverse proxy needed).
+- Address precedence: `--resource` > `--host` > JSON `resource` > JSON `host`.
+
+The startup banner reports the active mode (TLS / API key) and prints an example
+smoke-test `curl`.
 
 ## Docker
 
 ```bash
 docker build -t skippy-mcp:latest .
-# --network host is needed to reach a link-local / same-LAN instrument:
-docker run --rm -i --network host skippy-mcp:latest \
-  --resource TCPIP0::<scope-ip>::5555::SOCKET
+# --network host reaches a link-local / same-LAN instrument; -p publishes the API:
+docker run --rm --network host skippy-mcp:latest \
+  --resource TCPIP0::<scope-ip>::5555::SOCKET --port 8080
 ```
 
-The image is pure-Python (`pyvisa-py`), runs as a non-root user, and serves MCP
-over stdio (`-i`).
+The image is pure-Python (`pyvisa-py`) and runs as a non-root user.
 
 ## Tools
 
@@ -72,6 +96,8 @@ over stdio (`-i`).
 | [Initial design](claude-design/20260605A-skippy-mcp-initial-design.md) | Overview, architecture, tool surface, compatible models, prior art. |
 | [Detailed design](claude-design/20260609A-skippy-mcp-detailed-design.md) | Layered architecture, transport interface + simulator, dialect layer, error model, tool schemas. |
 | [Implementation plan](claude-design/20260609B-skippy-mcp-implementation-plan.md) | Phased build plan (hardware-free through Phase 6). |
+| [Validation summary](claude-design/20260609C-skippy-mcp-validation-summary.md) | v0.1.0 test results + live MSO5204 validation. |
+| [HTTP transport design](claude-design/20260609D-skippy-mcp-http-transport-design.md) | HTTP transport, config file, API-key auth, TLS (v0.2.0). |
 
 ## License
 

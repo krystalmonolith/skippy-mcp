@@ -17,3 +17,10 @@ dist/
 # Editor / OS
 *.swp
 .DS_Store
+
+# Local config (may hold API keys / TLS paths) and TLS material
+skippy.json
+*.local.json
+config*.json
+*.pem
+*.key

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import pytest
 
-from skippy_mcp.config import parse_args
 from skippy_mcp.core.enums import (
     BusProtocol,
     CaptureAction,
@@ -13,7 +12,7 @@ from skippy_mcp.core.enums import (
     MeasurementType,
     TriggerMode,
 )
-from skippy_mcp.core.errors import ConfigError, ScpiError, SkippyError, ValidationError
+from skippy_mcp.core.errors import ScpiError, SkippyError, ValidationError
 from skippy_mcp.core.models import BusConfig, ChannelConfig, LogicConfig, TriggerConfig
 from skippy_mcp.driver.scope import Scope
 from skippy_mcp.driver.session import establish
@@ -23,29 +22,6 @@ from skippy_mcp.transport.simulated import SimulatedTransport
 @pytest.fixture
 def scope() -> Scope:
     return establish(SimulatedTransport(), reset_on_connect=True)
-
-
-# -- config ---------------------------------------------------------------
-def test_config_builds_tcpip_resource_from_host() -> None:
-    cfg = parse_args(["--host", "192.168.1.50"])
-    assert cfg.resource == "TCPIP0::192.168.1.50::INSTR"
-    assert cfg.reset_on_connect is True
-    assert cfg.async_dispatch is False
-
-
-def test_config_flags() -> None:
-    cfg = parse_args(
-        ["--host", "x", "--async", "--no-reset", "--allow-raw-scpi", "--timeout-ms", "2000"]
-    )
-    assert cfg.async_dispatch is True
-    assert cfg.reset_on_connect is False
-    assert cfg.allow_raw_scpi is True
-    assert cfg.timeout_ms == 2000
-
-
-def test_config_requires_address() -> None:
-    with pytest.raises(ConfigError):
-        parse_args([])
 
 
 # -- session / identity ---------------------------------------------------

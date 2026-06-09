@@ -8,7 +8,7 @@ import pytest
 from skippy_mcp.core.errors import ValidationError
 from skippy_mcp.driver.scope import Scope
 from skippy_mcp.driver.session import establish
-from skippy_mcp.mcp.server import build_server, convert_output
+from skippy_mcp.mcp.server import build_mcp_server, convert_output
 from skippy_mcp.mcp.tools import ToolOutput, build_tool_specs
 from skippy_mcp.transport.simulated import SimulatedTransport
 
@@ -105,7 +105,7 @@ def test_convert_image_output_returns_content_list() -> None:
 
 
 # -- build_server ---------------------------------------------------------
-def test_build_server_constructs(scope: Scope) -> None:
+def test_build_mcp_server_constructs(scope: Scope) -> None:
     specs = build_tool_specs(allow_raw_scpi=False)
-    server = build_server(scope, specs, async_dispatch=False)
+    server = build_mcp_server(scope, specs)
     assert server.name == "skippy-mcp"

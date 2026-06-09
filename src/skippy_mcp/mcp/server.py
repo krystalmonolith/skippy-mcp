@@ -1,31 +1,44 @@
-"""MCP server wiring.
+"""MCP server wiring — Streamable HTTP transport only (no stdio).
 
 Adapts the SDK-agnostic tool specs in :mod:`skippy_mcp.mcp.tools` onto the MCP
-low-level :class:`Server`. The SDK validates tool input against each spec's
-``inputSchema`` and converts handler exceptions to ``isError`` results, so a
-raised :class:`SkippyError` surfaces its actionable message directly. Unexpected
-exceptions are logged with a traceback and replaced with a generic actionable
-message so internals never leak.
+low-level :class:`Server`, mounts it via ``StreamableHTTPSessionManager`` into a
+Starlette ASGI app, and serves it with uvicorn. Optional Bearer-key auth and
+TLS are driven by :class:`ServerConfig`.
+
+The SDK validates tool input against each spec's ``inputSchema`` and converts
+handler exceptions to ``isError`` results, so a raised :class:`SkippyError`
+surfaces its actionable message. The blocking driver runs in a worker thread so
+the event loop is never stalled.
 """
 
 from __future__ import annotations
 
 import base64
+import contextlib
+import hmac
 import logging
+from collections.abc import AsyncIterator
 from typing import Any
 
 import anyio
+import uvicorn
 from mcp import types
 from mcp.server.lowlevel import Server
-from mcp.server.stdio import stdio_server
+from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
+from starlette.applications import Starlette
+from starlette.responses import JSONResponse
+from starlette.routing import Mount
+from starlette.types import Receive, Scope, Send
 
-from skippy_mcp.config import parse_args
+from skippy_mcp.config import ServerConfig
 from skippy_mcp.core.errors import SkippyError
-from skippy_mcp.driver.scope import Scope
+from skippy_mcp.driver.scope import Scope as ScopeDriver
 from skippy_mcp.driver.session import establish, open_transport
 from skippy_mcp.mcp.tools import ToolOutput, ToolSpec, build_tool_specs
 
 logger = logging.getLogger("skippy_mcp")
+
+MCP_PATH = "/mcp"
 
 
 def convert_output(output: ToolOutput) -> Any:
@@ -42,8 +55,8 @@ def convert_output(output: ToolOutput) -> Any:
     return output.structured if output.structured is not None else {}
 
 
-def build_server(scope: Scope, specs: list[ToolSpec], *, async_dispatch: bool) -> Server:
-    """Construct an MCP server exposing ``specs`` backed by ``scope``."""
+def build_mcp_server(scope: ScopeDriver, specs: list[ToolSpec]) -> Server:
+    """Build the low-level MCP server exposing ``specs`` backed by ``scope``."""
     server: Server = Server("skippy-mcp")
     by_name = {spec.name: spec for spec in specs}
 
@@ -64,10 +77,8 @@ def build_server(scope: Scope, specs: list[ToolSpec], *, async_dispatch: bool) -
                 check=f"use one of: {', '.join(by_name)}",
             )
         try:
-            if async_dispatch:
-                output = await anyio.to_thread.run_sync(spec.handler, scope, arguments)
-            else:
-                output = spec.handler(scope, arguments)
+            # The driver is blocking; never run it on the event loop.
+            output = await anyio.to_thread.run_sync(spec.handler, scope, arguments)
         except SkippyError:
             raise
         except Exception as exc:
@@ -82,27 +93,110 @@ def build_server(scope: Scope, specs: list[ToolSpec], *, async_dispatch: bool) -
     return server
 
 
-async def _serve(server: Server) -> None:
-    async with stdio_server() as (read_stream, write_stream):
-        await server.run(read_stream, write_stream, server.create_initialization_options())
+class BearerAuthMiddleware:
+    """Pure-ASGI middleware: require ``Authorization: Bearer <key>`` on HTTP requests.
+
+    Implemented at the ASGI layer (not BaseHTTPMiddleware) so it does not buffer
+    the transport's streaming/SSE responses.
+    """
+
+    def __init__(self, app: Any, api_key: str) -> None:
+        self._app = app
+        self._expected = f"Bearer {api_key}"
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] == "http":
+            headers = dict(scope.get("headers") or [])
+            presented = headers.get(b"authorization", b"").decode("latin-1")
+            if not hmac.compare_digest(presented, self._expected):
+                response = JSONResponse(
+                    {"error": "unauthorized", "detail": "missing or invalid Bearer API key"},
+                    status_code=401,
+                )
+                await response(scope, receive, send)
+                return
+        await self._app(scope, receive, send)
+
+
+def build_app(server: Server, *, api_key: str | None = None) -> Any:
+    """Mount ``server`` as a Streamable HTTP ASGI app, optionally behind auth."""
+    manager = StreamableHTTPSessionManager(app=server, json_response=False, stateless=False)
+
+    async def handle_mcp(scope: Scope, receive: Receive, send: Send) -> None:
+        await manager.handle_request(scope, receive, send)
+
+    @contextlib.asynccontextmanager
+    async def lifespan(_: Starlette) -> AsyncIterator[None]:
+        async with manager.run():
+            yield
+
+    app: Any = Starlette(routes=[Mount(MCP_PATH, app=handle_mcp)], lifespan=lifespan)
+    if api_key is not None:
+        app = BearerAuthMiddleware(app, api_key)
+    return app
+
+
+def build_banner(config: ServerConfig, model: str, series: str, n_tools: int) -> str:
+    """Human-readable startup banner describing the active mode + a smoke test."""
+    from skippy_mcp import __version__
+
+    endpoint = f"{config.scheme}://{config.bind}:{config.port}{MCP_PATH}"
+    smoke_host = f"{config.scheme}://<host>:{config.port}{MCP_PATH}"
+    auth_line = "    -H 'Authorization: Bearer <your-api-key>' \\\n" if config.api_key else ""
+    init = (
+        '{"jsonrpc":"2.0","id":1,"method":"initialize","params":'
+        '{"protocolVersion":"2024-11-05","capabilities":{},'
+        '"clientInfo":{"name":"smoke","version":"1.0"}}}'
+    )
+    return (
+        f"SkippyMCP {__version__} — serving {model} ({series})\n"
+        f"  Endpoint : {endpoint}\n"
+        f"  TLS      : {'enabled' if config.tls_enabled else 'disabled'}\n"
+        f"  API key  : {'enabled' if config.api_key else 'disabled'}\n"
+        f"  Tools    : {n_tools}\n"
+        f"  Smoke test:\n"
+        f"    curl -sS {smoke_host} \\\n"
+        f"    -H 'Content-Type: application/json' \\\n"
+        f"    -H 'Accept: application/json, text/event-stream' \\\n"
+        f"{auth_line}"
+        f"    -d '{init}'"
+    )
 
 
 def main() -> None:
-    """Console-script entry point."""
-    logging.basicConfig(level=logging.INFO)  # stderr; stdout is the MCP channel.
-    config = parse_args()
+    """Console-script entry point: connect, then serve MCP over HTTP."""
+    logging.basicConfig(level=logging.INFO)
+    config = parse_args_or_exit()
     transport = open_transport(config)
     scope = establish(transport, reset_on_connect=config.reset_on_connect)
     specs = build_tool_specs(config.allow_raw_scpi)
-    server = build_server(scope, specs, async_dispatch=config.async_dispatch)
-    logger.info(
-        "SkippyMCP serving %s (%s), %d tools, %s dispatch",
-        scope.identify().model,
-        scope.dialect_series,
-        len(specs),
-        "async" if config.async_dispatch else "sync",
+    server = build_mcp_server(scope, specs)
+    app = build_app(server, api_key=config.api_key)
+
+    idn = scope.identify()
+    print(build_banner(config, idn.model, scope.dialect_series, len(specs)), flush=True)
+
+    uvicorn.run(
+        app,
+        host=config.bind,
+        port=config.port,
+        ssl_certfile=config.tls_cert,
+        ssl_keyfile=config.tls_key,
+        log_level="info",
     )
-    anyio.run(_serve, server)
+
+
+def parse_args_or_exit() -> ServerConfig:
+    """Parse CLI/config, turning ConfigError into a clean stderr message + exit."""
+    import sys
+
+    from skippy_mcp.config import parse_args
+
+    try:
+        return parse_args()
+    except SkippyError as exc:
+        print(str(exc), file=sys.stderr)
+        raise SystemExit(2) from exc
 
 
 if __name__ == "__main__":
