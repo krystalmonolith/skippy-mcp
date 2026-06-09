@@ -35,6 +35,10 @@ python_version = "3.11"
 strict = true
 files = ["src"]
 
+[[tool.mypy.overrides]]
+module = ["pyvisa.*", "mcp.*"]
+ignore_missing_imports = true
+
 [tool.ruff]
 line-length = 100
 src = ["src", "tests"]
