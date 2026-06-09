@@ -64,6 +64,32 @@ All keys optional. No file → plain HTTP, no auth.
 The startup banner reports the active mode (TLS / API key) and prints an example
 smoke-test `curl`.
 
+Ready-to-edit examples for each mode live in
+[`examples/json-configuration/`](examples/json-configuration/):
+
+| File | Mode |
+|------|------|
+| [`http-apikey.json`](examples/json-configuration/http-apikey.json) | HTTP + Bearer API key |
+| [`https-tls.json`](examples/json-configuration/https-tls.json) | HTTPS/TLS, no auth |
+| [`https-tls-apikey.json`](examples/json-configuration/https-tls-apikey.json) | HTTPS/TLS + Bearer API key |
+
+### Generating a self-signed TLS certificate
+
+For local/LAN testing you can make a self-signed cert and key. Include the
+address you'll connect to in the `subjectAltName` so clients can verify it:
+
+```bash
+openssl req -x509 -newkey rsa:2048 -nodes -days 365 \
+  -keyout key.pem -out cert.pem \
+  -subj "/CN=localhost" \
+  -addext "subjectAltName=IP:127.0.0.1,DNS:localhost"
+```
+
+Point `tls.cert` / `tls.key` at the resulting files. Clients that don't already
+trust the cert can be told to with `SSL_CERT_FILE=cert.pem`. In Docker, the cert
+and key must be **readable by the container's non-root user** (e.g. `chmod 644`).
+For production, prefer a CA-issued certificate over a self-signed one.
+
 ## Docker
 
 ```bash
