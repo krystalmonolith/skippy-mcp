@@ -65,10 +65,23 @@ def test_measure_handler_returns_value_and_unit(scope: Scope) -> None:
     assert out.structured["unit"] == "V"
 
 
-def test_screenshot_handler_returns_image(scope: Scope) -> None:
-    out = _spec("screenshot").handler(scope, {"format": "png"})
+def test_screenshot_handler_transcodes_to_png(scope: Scope) -> None:
+    # Scope captures BMP natively; the handler must deliver PNG.
+    out = _spec("screenshot").handler(scope, {})
     assert out.image is not None
+    assert out.image.image_format.value == "png"
     assert out.image.data.startswith(b"\x89PNG")
+
+
+def test_to_png_transcodes_bmp_to_png() -> None:
+    from skippy_mcp.core.enums import ImageFormat
+    from skippy_mcp.mcp.imaging import to_png
+    from skippy_mcp.transport.simulated import SimulatedTransport
+
+    bmp = SimulatedTransport().query_binary(":DISPlay:DATA?")
+    assert bmp.startswith(b"BM")
+    png = to_png(bmp, ImageFormat.BMP)
+    assert png.startswith(b"\x89PNG\r\n\x1a\n")
 
 
 def test_bad_enum_value_raises_validation_error(scope: Scope) -> None:

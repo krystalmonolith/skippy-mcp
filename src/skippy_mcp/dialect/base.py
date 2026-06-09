@@ -32,6 +32,8 @@ class Dialect(ABC):
     """Maps semantic operations to SCPI for one instrument series."""
 
     series: str = "GENERIC"
+    #: Image format the scope returns from :meth:`screenshot` (transcoded later).
+    native_screenshot_format: ImageFormat = ImageFormat.BMP
 
     @abstractmethod
     def matches(self, idn: IdnInfo) -> bool:
@@ -125,8 +127,8 @@ class Dialect(ABC):
 
     # -- screenshot ------------------------------------------------------
     @abstractmethod
-    def screenshot(self, fmt: ImageFormat) -> str:
-        """Command that returns a screen image as a binary block."""
+    def screenshot(self) -> str:
+        """Command that returns a screen image (in ``native_screenshot_format``)."""
 
     # -- waveform --------------------------------------------------------
     def waveform_source(self, source: str) -> str:

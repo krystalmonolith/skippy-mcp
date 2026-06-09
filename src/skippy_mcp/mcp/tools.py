@@ -33,6 +33,7 @@ from skippy_mcp.core.models import (
     TriggerConfig,
 )
 from skippy_mcp.driver.scope import Scope
+from skippy_mcp.mcp.imaging import to_png
 
 _E = TypeVar("_E", bound=Enum)
 
@@ -150,9 +151,9 @@ def _h_measure(scope: Scope, args: dict[str, Any]) -> ToolOutput:
 
 
 def _h_screenshot(scope: Scope, args: dict[str, Any]) -> ToolOutput:
-    fmt_value = args.get("format", ImageFormat.PNG.value)
-    fmt = _enum(ImageFormat, fmt_value, "screenshot", "format")
-    return ToolOutput(image=scope.screenshot(fmt))
+    shot = scope.screenshot()  # native format (BMP on MSO5000)
+    png = to_png(shot.data, shot.image_format)
+    return ToolOutput(image=Screenshot(image_format=ImageFormat.PNG, data=png))
 
 
 def _h_read_waveform(scope: Scope, args: dict[str, Any]) -> ToolOutput:
@@ -280,8 +281,8 @@ def build_tool_specs(allow_raw_scpi: bool) -> list[ToolSpec]:
         ),
         ToolSpec(
             "screenshot",
-            "Capture the instrument display as an image.",
-            _obj({"format": {"type": "string", "enum": _enum_values(ImageFormat)}}, []),
+            "Capture the instrument display as a PNG image.",
+            _obj({}, []),
             _h_screenshot,
         ),
         ToolSpec(

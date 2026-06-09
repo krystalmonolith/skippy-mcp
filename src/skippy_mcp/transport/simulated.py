@@ -11,14 +11,21 @@ Behavior is intentionally deterministic (no randomness) so tests are stable.
 from __future__ import annotations
 
 import math
+import struct
 
-# A minimal but valid PNG (1x1) — enough for screenshot round-trip assertions.
-_FAKE_PNG: bytes = (
-    b"\x89PNG\r\n\x1a\n"
-    b"\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89"
-    b"\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n-\xb4"
-    b"\x00\x00\x00\x00IEND\xaeB`\x82"
-)
+
+def _make_bmp(width: int = 2, height: int = 2) -> bytes:
+    """Build a minimal valid 24-bit BMP, matching what an MSO5000 returns."""
+    row_stride = (width * 3 + 3) & ~3  # rows padded to 4 bytes
+    pixel_bytes = row_stride * height
+    file_size = 54 + pixel_bytes
+    header = struct.pack("<2sIHHI", b"BM", file_size, 0, 0, 54)
+    dib = struct.pack("<IiiHHIIiiII", 40, width, height, 1, 24, 0, pixel_bytes, 0, 0, 0, 0)
+    return header + dib + b"\x00" * pixel_bytes
+
+
+# A minimal but valid 24-bit BMP — the MSO5000 :DISPlay:DATA? native format.
+_FAKE_BMP: bytes = _make_bmp()
 
 # Deterministic measurement values keyed by SCPI item mnemonic.
 _MEASUREMENTS: dict[str, str] = {
@@ -95,7 +102,7 @@ class SimulatedTransport:
         self.history.append(command)
         cmd = command.strip()
         if cmd.startswith(":DISPlay:DATA?") or cmd.startswith(":DISP:DATA?"):
-            return _FAKE_PNG
+            return _FAKE_BMP
         if cmd.startswith(":WAVeform:DATA?") or cmd.startswith(":WAV:DATA?"):
             return self._waveform_bytes()
         return b""

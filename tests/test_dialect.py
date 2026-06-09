@@ -72,7 +72,8 @@ def test_golden_measure_and_screenshot(mso: MSO5000Dialect) -> None:
         mso.measure_item(MeasurementType.DELAY, "CH1", "CH2")
         == ":MEASure:ITEM? RDELay,CHANnel1,CHANnel2"
     )
-    assert mso.screenshot(ImageFormat.PNG) == ":DISPlay:DATA? PNG"
+    assert mso.screenshot() == ":DISPlay:DATA?"
+    assert mso.native_screenshot_format is ImageFormat.BMP
 
 
 def test_source_token_translation(mso: MSO5000Dialect) -> None:
@@ -97,7 +98,7 @@ def test_base_refuses_logic_and_bus() -> None:
         def limits(self):  # type: ignore[no-untyped-def]
             raise NotImplementedError
 
-        def screenshot(self, fmt: ImageFormat) -> str:
+        def screenshot(self) -> str:
             return ""
 
     bare = BareDialect()

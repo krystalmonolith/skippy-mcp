@@ -11,7 +11,6 @@ import logging
 
 from skippy_mcp.core.enums import (
     CaptureAction,
-    ImageFormat,
     MeasurementType,
     TriggerMode,
     WaveformMode,
@@ -146,9 +145,10 @@ class Scope:
         return MeasurementResult(type=mtype, source=source, value=value, unit=_UNITS[mtype])
 
     # -- screenshot ------------------------------------------------------
-    def screenshot(self, fmt: ImageFormat = ImageFormat.PNG) -> Screenshot:
-        data = self._t.query_binary(self._d.screenshot(fmt))
-        return Screenshot(image_format=fmt, data=data)
+    def screenshot(self) -> Screenshot:
+        """Capture the screen in the scope's native image format (no transcode)."""
+        data = self._t.query_binary(self._d.screenshot())
+        return Screenshot(image_format=self._d.native_screenshot_format, data=data)
 
     # -- waveform --------------------------------------------------------
     def read_waveform(

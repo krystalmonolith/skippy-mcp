@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from skippy_mcp.core.enums import BusProtocol, ImageFormat
+from skippy_mcp.core.enums import BusProtocol
 from skippy_mcp.core.models import DeviceLimits, IdnInfo
 from skippy_mcp.dialect.base import Dialect, register
 
@@ -26,8 +26,10 @@ class MSO5000Dialect(Dialect):
         )
 
     # -- screenshot ------------------------------------------------------
-    def screenshot(self, fmt: ImageFormat) -> str:
-        return f":DISPlay:DATA? {fmt.scpi}"
+    def screenshot(self) -> str:
+        # MSO5000 :DISPlay:DATA? always returns a 24-bit BMP; format args are
+        # silently ignored (verified on an MSO5204). Transcoding happens later.
+        return ":DISPlay:DATA?"
 
     # -- digital / logic -------------------------------------------------
     def logic_enable(self, d: int, on: bool) -> str:

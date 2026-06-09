@@ -52,10 +52,10 @@ def test_unknown_measurement_returns_sentinel() -> None:
     assert sim.query(":MEASure:ITEM? NOPE,CHANnel1") == "9.9E37"
 
 
-def test_screenshot_returns_png_signature() -> None:
+def test_screenshot_returns_bmp_signature() -> None:
     sim = SimulatedTransport()
-    data = sim.query_binary(":DISPlay:DATA? PNG")
-    assert data.startswith(b"\x89PNG\r\n\x1a\n")
+    data = sim.query_binary(":DISPlay:DATA?")
+    assert data.startswith(b"BM")  # MSO5000 native format is 24-bit BMP
 
 
 def test_waveform_bytes_and_preamble() -> None:

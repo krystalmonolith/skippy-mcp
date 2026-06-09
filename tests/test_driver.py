@@ -131,10 +131,10 @@ def test_measure_unavailable_raises_actionable_error() -> None:
 
 
 # -- screenshot / waveform ------------------------------------------------
-def test_screenshot_returns_png(scope: Scope) -> None:
-    shot = scope.screenshot(ImageFormat.PNG)
-    assert shot.image_format is ImageFormat.PNG
-    assert shot.data.startswith(b"\x89PNG")
+def test_screenshot_returns_native_bmp(scope: Scope) -> None:
+    shot = scope.screenshot()
+    assert shot.image_format is ImageFormat.BMP  # driver returns the native format
+    assert shot.data.startswith(b"BM")
 
 
 def test_read_waveform_decodes_volts(scope: Scope) -> None:

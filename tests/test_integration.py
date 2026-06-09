@@ -61,9 +61,10 @@ def test_end_to_end_configure_capture_measure_screenshot() -> None:
     assert meas.structuredContent is not None
     assert meas.structuredContent["value"] > 0
 
-    shot = _call(server, "screenshot", {"format": "png"})
+    shot = _call(server, "screenshot", {})
     assert shot.isError is False
     assert shot.content[0].type == "image"
+    assert shot.content[0].mimeType == "image/png"
 
 
 def test_schema_validation_rejects_bad_channel() -> None:
