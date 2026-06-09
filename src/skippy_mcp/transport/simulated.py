@@ -44,6 +44,7 @@ class SimulatedTransport:
     def __init__(self) -> None:
         self._state: dict[str, str] = {}
         self._errors: list[tuple[int, str]] = []
+        self.measurement_override: str | None = None
         self.history: list[str] = []
         self.closed = False
 
@@ -51,6 +52,10 @@ class SimulatedTransport:
     def queue_error(self, code: int, message: str) -> None:
         """Make the next ``:SYSTem:ERRor?`` report this error (for tests)."""
         self._errors.append((code, message))
+
+    def force_measurement(self, value: str) -> None:
+        """Make every measurement query return ``value`` (for tests)."""
+        self.measurement_override = value
 
     # -- Transport protocol ----------------------------------------------
     def write(self, command: str) -> None:
@@ -79,6 +84,9 @@ class SimulatedTransport:
             return self._measure(cmd)
         if cmd.startswith(":WAVeform:PREamble?") or cmd.startswith(":WAV:PRE?"):
             return self._waveform_preamble()
+        if cmd.startswith(":BUS") and cmd.endswith(":DATA?"):
+            # Canned decode: frames are "time,label,data" separated by ';'.
+            return "0.000000E+00,I2C,0x3A;1.000000E-04,I2C,0x42"
         # Generic set/query round-trip.
         node = cmd[:-1].upper() if cmd.endswith("?") else cmd.upper()
         return self._normalize(node, self._state.get(node, "0"))
@@ -96,8 +104,9 @@ class SimulatedTransport:
         self.closed = True
 
     # -- internals --------------------------------------------------------
-    @staticmethod
-    def _measure(cmd: str) -> str:
+    def _measure(self, cmd: str) -> str:
+        if self.measurement_override is not None:
+            return self.measurement_override
         _, _, arg = cmd.partition("?")
         item = arg.strip().split(",", 1)[0].strip()
         return _MEASUREMENTS.get(item, _MEASUREMENT_INVALID)
