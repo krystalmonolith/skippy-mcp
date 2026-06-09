@@ -39,6 +39,18 @@ skippy-mcp --resource TCPIP0::scope::INSTR
 | `--no-reset` | reset on | Skip `*RST` on connect; leave the setup untouched. |
 | `--allow-raw-scpi` | off | Register the `scpi_raw` escape-hatch tool. |
 
+## Docker
+
+```bash
+docker build -t skippy-mcp:latest .
+# --network host is needed to reach a link-local / same-LAN instrument:
+docker run --rm -i --network host skippy-mcp:latest \
+  --resource TCPIP0::<scope-ip>::5555::SOCKET
+```
+
+The image is pure-Python (`pyvisa-py`), runs as a non-root user, and serves MCP
+over stdio (`-i`).
+
 ## Tools
 
 `get_identity`, `configure_channel`, `configure_logic`, `configure_trigger`,
