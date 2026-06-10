@@ -23,14 +23,22 @@ Optional JSON config file (--config). All keys are optional:
     "host": "192.168.1.50",                         # instrument IP/hostname
     "resource": "TCPIP0::192.168.1.50::5555::SOCKET",  # full VISA resource
     "api_key": "your-bearer-token",                 # require Bearer auth if set
-    "tls": { "cert": "/path/cert.pem", "key": "/path/key.pem" }  # serve HTTPS if set
+    "tls": { "cert": "/path/cert.pem", "key": "/path/key.pem" },  # serve HTTPS if set
+    "allowed_hosts": ["scope-host.lan:*"],          # extra Host values to accept
+    "allowed_origins": ["https://app.example.com"]  # extra Origin values to accept
   }
 
 Address precedence (highest first): --resource, --host, JSON resource, JSON host.
 No api_key -> no auth.  No tls -> plain HTTP.  No config file -> plain HTTP, no auth.
+
+DNS-rebinding protection is always on: requests are accepted only if their Host
+header matches the bind address or localhost (any port). Add other names a client
+may use (e.g. a LAN hostname) via "allowed_hosts"; add browser Origins via
+"allowed_origins". The --timeout-ms value (default 300000) is the per-I/O VISA
+timeout; 0 means wait forever.
 """
 
-_ALLOWED_KEYS = {"host", "resource", "api_key", "tls"}
+_ALLOWED_KEYS = {"host", "resource", "api_key", "tls", "allowed_hosts", "allowed_origins"}
 _ALLOWED_TLS_KEYS = {"cert", "key"}
 
 
@@ -39,14 +47,16 @@ class ServerConfig:
     """Resolved runtime configuration for the HTTP MCP server."""
 
     resource: str
-    bind: str = "0.0.0.0"
+    bind: str = "127.0.0.1"
     port: int = 8080
-    timeout_ms: int = 5000
+    timeout_ms: int = 300000
     reset_on_connect: bool = True
     allow_raw_scpi: bool = False
     api_key: str | None = None
     tls_cert: str | None = None
     tls_key: str | None = None
+    allowed_hosts: tuple[str, ...] = ()
+    allowed_origins: tuple[str, ...] = ()
 
     @property
     def tls_enabled(self) -> bool:
@@ -55,6 +65,11 @@ class ServerConfig:
     @property
     def scheme(self) -> str:
         return "https" if self.tls_enabled else "http"
+
+    @property
+    def is_loopback_bind(self) -> bool:
+        """True if the bind address is a loopback/localhost address (not exposed)."""
+        return self.bind in ("127.0.0.1", "localhost", "::1")
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -67,9 +82,18 @@ def _build_parser() -> argparse.ArgumentParser:
     target = parser.add_mutually_exclusive_group()
     target.add_argument("--host", help="Instrument IP/hostname (overrides JSON host/resource).")
     target.add_argument("--resource", help="Full VISA resource string (highest precedence).")
-    parser.add_argument("--bind", default="0.0.0.0", help="HTTP bind address (default 0.0.0.0).")
+    parser.add_argument(
+        "--bind",
+        default="127.0.0.1",
+        help="HTTP bind address (default 127.0.0.1; use 0.0.0.0 to expose on the LAN).",
+    )
     parser.add_argument("--port", type=int, default=8080, help="HTTP port (default 8080).")
-    parser.add_argument("--timeout-ms", type=int, default=5000, help="VISA I/O timeout (ms).")
+    parser.add_argument(
+        "--timeout-ms",
+        type=int,
+        default=300000,
+        help="Per-I/O VISA timeout in ms (default 300000; 0 = wait forever).",
+    )
     parser.add_argument(
         "--no-reset",
         dest="reset_on_connect",
@@ -141,6 +165,20 @@ def _resolve_tls(data: dict[str, Any]) -> tuple[str | None, str | None]:
     return str(tls["cert"]), str(tls["key"])
 
 
+def _resolve_str_list(data: dict[str, Any], key: str) -> tuple[str, ...]:
+    """Validate an optional config key as a list of non-empty strings."""
+    value = data.get(key)
+    if value is None:
+        return ()
+    if not isinstance(value, list) or not all(isinstance(v, str) and v for v in value):
+        raise ConfigError(
+            "configure",
+            reason=f"{key!r} must be a list of non-empty strings",
+            check=f"set {key} to a JSON array of host/origin strings, or omit it",
+        )
+    return tuple(value)
+
+
 def parse_args(argv: Sequence[str] | None = None) -> ServerConfig:
     """Parse argv (+ optional JSON config) into a :class:`ServerConfig`."""
     ns = _build_parser().parse_args(argv)
@@ -162,11 +200,11 @@ def parse_args(argv: Sequence[str] | None = None) -> ServerConfig:
             check="pass --host/--resource, or set host/resource in the --config file",
         )
 
-    if ns.timeout_ms <= 0:
+    if ns.timeout_ms < 0:
         raise ConfigError(
             "configure",
-            reason="timeout must be positive",
-            check="pass --timeout-ms with a value greater than 0",
+            reason="timeout must be 0 (wait forever) or a positive number of ms",
+            check="pass --timeout-ms with a value >= 0",
             inputs={"timeout_ms": ns.timeout_ms},
         )
 
@@ -178,6 +216,8 @@ def parse_args(argv: Sequence[str] | None = None) -> ServerConfig:
             check="set api_key to a non-empty token, or omit it for no auth",
         )
     tls_cert, tls_key = _resolve_tls(data)
+    allowed_hosts = _resolve_str_list(data, "allowed_hosts")
+    allowed_origins = _resolve_str_list(data, "allowed_origins")
 
     return ServerConfig(
         resource=resource,
@@ -189,4 +229,6 @@ def parse_args(argv: Sequence[str] | None = None) -> ServerConfig:
         api_key=api_key,
         tls_cert=tls_cert,
         tls_key=tls_key,
+        allowed_hosts=allowed_hosts,
+        allowed_origins=allowed_origins,
     )

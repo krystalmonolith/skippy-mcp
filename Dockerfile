@@ -34,6 +34,9 @@ COPY --from=builder /opt/venv /opt/venv
 RUN useradd --create-home --uid 10001 skippy
 USER skippy
 
-# The server speaks MCP over stdio; pass --host/--resource (and optional flags).
-# Example: docker run --rm -i skippy-mcp:latest --resource TCPIP0::scope::5555::SOCKET
+# The server speaks MCP over HTTP (Streamable HTTP) on port 8080; it binds
+# loopback by default — pass --bind 0.0.0.0 to expose it outside the container.
+# Example: docker run --rm --network host skippy-mcp:latest \
+#            --resource TCPIP0::scope::5555::SOCKET --bind 0.0.0.0
+EXPOSE 8080
 ENTRYPOINT ["skippy-mcp"]

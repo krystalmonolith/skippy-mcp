@@ -4,4 +4,4 @@ import skippy_mcp
 
 
 def test_version_is_present() -> None:
-    assert skippy_mcp.__version__ == "0.2.0"
+    assert skippy_mcp.__version__ == "0.3.0"

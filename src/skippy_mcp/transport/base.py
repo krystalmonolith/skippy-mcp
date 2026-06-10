@@ -26,6 +26,10 @@ class Transport(Protocol):
         """Send a query and return its IEEE-488.2 binary-block payload."""
         ...
 
+    def set_timeout(self, timeout_ms: int | None) -> None:
+        """Set the per-I/O timeout. ``0`` or ``None`` means wait forever."""
+        ...
+
     def close(self) -> None:
         """Release the underlying resource."""
         ...

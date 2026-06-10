@@ -89,6 +89,47 @@ def test_bad_enum_value_raises_validation_error(scope: Scope) -> None:
         _spec("configure_channel").handler(scope, {"channel": 1, "coupling": "bogus"})
 
 
+# -- D1: unimplemented status (no silent drops) ---------------------------
+def test_configure_logic_label_reported_unimplemented(scope: Scope) -> None:
+    out = _spec("configure_logic").handler(scope, {"channels": [0], "label": "clk"})
+    assert out.structured is not None
+    assert out.structured["status"] == "ok"
+    assert out.structured["unimplemented"] == ["label"]
+
+
+def test_configure_logic_without_label_has_no_unimplemented(scope: Scope) -> None:
+    out = _spec("configure_logic").handler(scope, {"channels": [0], "enabled": True})
+    assert out.structured is not None
+    assert "unimplemented" not in out.structured
+
+
+def test_non_edge_trigger_reports_unimplemented(scope: Scope) -> None:
+    out = _spec("configure_trigger").handler(scope, {"mode": "pattern"})
+    assert out.structured is not None
+    assert out.structured["status"] == "unimplemented"
+    assert out.structured["mode"] == "pattern"
+    assert out.structured["implemented"] == ["edge"]
+
+
+def test_edge_trigger_still_ok(scope: Scope) -> None:
+    out = _spec("configure_trigger").handler(scope, {"mode": "edge", "source": "CH1"})
+    assert out.structured == {"status": "ok", "mode": "edge"}
+
+
+def test_decode_bus_config_reported_unimplemented(scope: Scope) -> None:
+    out = _spec("decode_bus").handler(
+        scope, {"bus": 1, "protocol": "i2c", "config": {"address": "0x3A"}}
+    )
+    assert out.structured is not None
+    assert out.structured["unimplemented"] == ["config"]
+
+
+def test_decode_bus_without_config_has_no_unimplemented(scope: Scope) -> None:
+    out = _spec("decode_bus").handler(scope, {"bus": 1, "protocol": "i2c"})
+    assert out.structured is not None
+    assert "unimplemented" not in out.structured
+
+
 # -- output conversion ----------------------------------------------------
 def test_convert_structured_output_returns_dict() -> None:
     assert convert_output(ToolOutput(structured={"a": 1})) == {"a": 1}

@@ -35,7 +35,8 @@ python3 -m venv .venv
 The server speaks MCP over **HTTP** (Streamable HTTP) at `/mcp`:
 
 ```bash
-skippy-mcp --host 192.168.1.50            # plain HTTP on 0.0.0.0:8080
+skippy-mcp --host 192.168.1.50            # plain HTTP on 127.0.0.1:8080 (loopback only)
+skippy-mcp --host 192.168.1.50 --bind 0.0.0.0   # expose on the LAN (see security note)
 skippy-mcp --resource TCPIP0::scope::5555::SOCKET --port 9000
 skippy-mcp --config skippy.json           # API key / TLS / address from JSON
 ```
@@ -43,12 +44,32 @@ skippy-mcp --config skippy.json           # API key / TLS / address from JSON
 | Flag | Default | Effect |
 |------|---------|--------|
 | `--host` / `--resource` | — | Instrument address (CLI overrides the config file). |
-| `--bind` | `0.0.0.0` | HTTP bind address. |
+| `--bind` | `127.0.0.1` | HTTP bind address. Use `0.0.0.0` to expose on the LAN. |
 | `--port` | `8080` | HTTP port. |
-| `--timeout-ms` | 5000 | VISA I/O timeout. |
+| `--timeout-ms` | 300000 | Per-I/O VISA timeout in ms. `0` = wait forever (handy for long single-shots). |
 | `--no-reset` | reset on | Skip `*RST` on connect; leave the setup untouched. |
 | `--allow-raw-scpi` | off | Register the `scpi_raw` escape-hatch tool. |
 | `--config <path>` | none | Optional JSON config (below). |
+
+### Security defaults
+
+- **Binds loopback (`127.0.0.1`) by default.** Pass `--bind 0.0.0.0` to expose the
+  server on the network. If you do so **without** an `api_key`, the server starts but
+  prints a loud warning — anyone who can reach the port can control the instrument.
+- **DNS-rebinding protection is always on.** Requests are accepted only if their `Host`
+  header matches the bind address or localhost (any port). Add other names a client may
+  use (a LAN hostname, or anything when bound to `0.0.0.0`) via `allowed_hosts`; add
+  browser `Origin` values via `allowed_origins`.
+- **An `api_key` over plain HTTP is sent in cleartext** — the server warns; enable `tls`
+  for confidentiality.
+
+### Per-request timeout
+
+Each tool call uses the `--timeout-ms` value as its per-I/O timeout, so a hung query (e.g.
+the scope is busy) surfaces an actionable timeout error naming the last command rather than
+hanging. A client may override the timeout for a single call with the
+`X-Skippy-Timeout-Ms` request header (`0` = wait forever) — useful when arming a long
+single-shot capture. This header is a SkippyMCP extension, not part of the MCP spec.
 
 ### Config file (`--config`)
 
@@ -59,12 +80,17 @@ All keys optional. No file → plain HTTP, no auth.
   "host": "192.168.1.50",
   "resource": "TCPIP0::192.168.1.50::5555::SOCKET",
   "api_key": "your-bearer-token",
-  "tls": { "cert": "/path/cert.pem", "key": "/path/key.pem" }
+  "tls": { "cert": "/path/cert.pem", "key": "/path/key.pem" },
+  "allowed_hosts": ["scope-host.lan:*"],
+  "allowed_origins": ["https://app.example.com"]
 }
 ```
 
 - `api_key` set → require `Authorization: Bearer <key>` on every request.
 - `tls` set → serve HTTPS directly (no reverse proxy needed).
+- `allowed_hosts` / `allowed_origins` → extra `Host` / `Origin` values accepted by the
+  DNS-rebinding guard (localhost and the bind address are always accepted; a `host:*`
+  entry matches any port). Needed for access via a LAN hostname or when bound to `0.0.0.0`.
 - Address precedence: `--resource` > `--host` > JSON `resource` > JSON `host`.
 
 The startup banner reports the active mode (TLS / API key) and prints an example
@@ -100,9 +126,11 @@ For production, prefer a CA-issued certificate over a self-signed one.
 
 ```bash
 docker build -t skippy-mcp:latest .
-# --network host reaches a link-local / same-LAN instrument; -p publishes the API:
+# --network host reaches a link-local / same-LAN instrument. Bind 0.0.0.0 so the API
+# is reachable from outside the container (it defaults to loopback); pair with an
+# api_key in --config when doing so:
 docker run --rm --network host skippy-mcp:latest \
-  --resource TCPIP0::<scope-ip>::5555::SOCKET --port 8080
+  --resource TCPIP0::<scope-ip>::5555::SOCKET --port 8080 --bind 0.0.0.0
 ```
 
 The image is pure-Python (`pyvisa-py`) and runs as a non-root user.

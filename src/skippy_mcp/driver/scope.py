@@ -8,6 +8,8 @@ SCPI via the dialect, and (3) for state-changing operations, checks the scope's
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterator
+from contextlib import contextmanager
 
 from skippy_mcp.core.enums import (
     CaptureAction,
@@ -50,11 +52,34 @@ logger = logging.getLogger(__name__)
 class Scope:
     """High-level control of one connected instrument."""
 
-    def __init__(self, transport: Transport, dialect: Dialect, idn: IdnInfo) -> None:
+    def __init__(
+        self,
+        transport: Transport,
+        dialect: Dialect,
+        idn: IdnInfo,
+        *,
+        default_timeout_ms: int | None = None,
+    ) -> None:
         self._t = transport
         self._d = dialect
         self._idn = idn
         self._limits = dialect.limits()
+        #: Restored by :meth:`io_timeout` after a per-call override.
+        self._default_timeout_ms = default_timeout_ms
+
+    # -- I/O timeout -----------------------------------------------------
+    @contextmanager
+    def io_timeout(self, timeout_ms: int | None) -> Iterator[None]:
+        """Apply ``timeout_ms`` to the transport for the body, then restore.
+
+        ``0``/``None`` means wait forever. Callers must serialize access to the
+        scope while inside this context (the transport timeout is shared state).
+        """
+        self._t.set_timeout(timeout_ms)
+        try:
+            yield
+        finally:
+            self._t.set_timeout(self._default_timeout_ms)
 
     # -- identity / lifecycle --------------------------------------------
     def identify(self) -> IdnInfo:
@@ -67,6 +92,10 @@ class Scope:
     def reset(self) -> None:
         self._t.write(self._d.reset())
         self._t.write(self._d.clear_status())
+
+    def close(self) -> None:
+        """Release the transport (e.g. free a VXI-11 link) on shutdown."""
+        self._t.close()
 
     # -- analog channel --------------------------------------------------
     def configure_channel(self, config: ChannelConfig) -> None:
