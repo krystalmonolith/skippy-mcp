@@ -54,6 +54,8 @@ class SimulatedTransport:
         self.measurement_override: str | None = None
         self.history: list[str] = []
         self.closed = False
+        self.timeout_ms: int | None = None
+        self.timeout_history: list[int | None] = []
 
     # -- test helpers -----------------------------------------------------
     def queue_error(self, code: int, message: str) -> None:
@@ -106,6 +108,11 @@ class SimulatedTransport:
         if cmd.startswith(":WAVeform:DATA?") or cmd.startswith(":WAV:DATA?"):
             return self._waveform_bytes()
         return b""
+
+    def set_timeout(self, timeout_ms: int | None) -> None:
+        """Record the requested per-I/O timeout (no real I/O to bound)."""
+        self.timeout_ms = timeout_ms
+        self.timeout_history.append(timeout_ms)
 
     def close(self) -> None:
         self.closed = True

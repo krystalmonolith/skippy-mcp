@@ -30,6 +30,7 @@ class PyVisaTransport:
     def __init__(self, resource: MessageBasedResource, *, timeout_ms: int) -> None:
         self._resource = resource
         self._timeout_ms = timeout_ms
+        self._default_timeout_ms = timeout_ms
 
     @classmethod
     def open(
@@ -45,7 +46,8 @@ class PyVisaTransport:
             resource: Any = manager.open_resource(resource_string)
         except Exception as exc:  # noqa: BLE001 - normalize any backend failure
             raise ConnectionFailedError(resource_string, reason=str(exc)) from exc
-        resource.timeout = timeout_ms
+        # 0 ms means "wait forever"; PyVISA spells that None / +inf.
+        resource.timeout = timeout_ms if timeout_ms else None
         resource.read_termination = "\n"
         resource.write_termination = "\n"
         return cls(resource, timeout_ms=timeout_ms)
@@ -71,6 +73,11 @@ class PyVisaTransport:
             )
         except VisaIOError as exc:
             self._raise_for(exc, command)
+
+    def set_timeout(self, timeout_ms: int | None) -> None:
+        """Set the per-I/O timeout. ``0``/``None`` -> wait forever (PyVISA +inf)."""
+        self._timeout_ms = 0 if timeout_ms is None else timeout_ms
+        self._resource.timeout = self._timeout_ms if self._timeout_ms else float("inf")
 
     def close(self) -> None:
         self._resource.close()

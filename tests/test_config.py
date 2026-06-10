@@ -25,12 +25,49 @@ def test_host_builds_tcpip_resource() -> None:
 
 def test_defaults() -> None:
     cfg = parse_args(["--host", "x"])
-    assert cfg.bind == "0.0.0.0"
+    assert cfg.bind == "127.0.0.1"
+    assert cfg.is_loopback_bind is True
     assert cfg.port == 8080
+    assert cfg.timeout_ms == 300000
     assert cfg.reset_on_connect is True
     assert cfg.api_key is None
     assert cfg.tls_enabled is False
     assert cfg.scheme == "http"
+    assert cfg.allowed_hosts == ()
+    assert cfg.allowed_origins == ()
+
+
+# -- timeout --------------------------------------------------------------
+def test_timeout_zero_allowed_means_infinite() -> None:
+    cfg = parse_args(["--host", "x", "--timeout-ms", "0"])
+    assert cfg.timeout_ms == 0
+
+
+def test_negative_timeout_rejected() -> None:
+    with pytest.raises(ConfigError):
+        parse_args(["--host", "x", "--timeout-ms", "-1"])
+
+
+def test_nonloopback_bind_not_loopback() -> None:
+    cfg = parse_args(["--host", "x", "--bind", "0.0.0.0"])
+    assert cfg.is_loopback_bind is False
+
+
+# -- allowed hosts / origins ---------------------------------------------
+def test_allowed_hosts_and_origins_from_json(tmp_path: Path) -> None:
+    cfg_path = _write(
+        tmp_path,
+        {"host": "x", "allowed_hosts": ["scope.lan:*"], "allowed_origins": ["https://app"]},
+    )
+    cfg = parse_args(["--config", cfg_path])
+    assert cfg.allowed_hosts == ("scope.lan:*",)
+    assert cfg.allowed_origins == ("https://app",)
+
+
+def test_allowed_hosts_must_be_string_list(tmp_path: Path) -> None:
+    cfg_path = _write(tmp_path, {"host": "x", "allowed_hosts": [1, 2]})
+    with pytest.raises(ConfigError):
+        parse_args(["--config", cfg_path])
 
 
 def test_no_address_anywhere_raises() -> None:

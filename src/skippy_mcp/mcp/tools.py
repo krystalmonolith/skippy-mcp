@@ -114,14 +114,33 @@ def _h_configure_logic(scope: Scope, args: dict[str, Any]) -> ToolOutput:
         label=args.get("label"),
     )
     scope.configure_logic(config)
-    return ToolOutput(structured={"status": "ok", "channels": list(config.channels)})
+    structured: dict[str, Any] = {"status": "ok", "channels": list(config.channels)}
+    if args.get("label") is not None:
+        # Accepted for forward-compatibility but not yet emitted to the scope.
+        structured["unimplemented"] = ["label"]
+    return ToolOutput(structured=structured)
 
 
 def _h_configure_trigger(scope: Scope, args: dict[str, Any]) -> ToolOutput:
     op = "configure_trigger"
+    mode = _enum(TriggerMode, args["mode"], op, "mode")
+    if mode is not TriggerMode.EDGE:
+        # Only edge-trigger configuration is implemented; report rather than
+        # silently applying a partial setup or ignoring the request.
+        return ToolOutput(
+            structured={
+                "status": "unimplemented",
+                "mode": mode.value,
+                "implemented": ["edge"],
+                "detail": (
+                    f"detailed configuration for the {mode.value!r} trigger is not yet "
+                    "implemented; only 'edge' is fully supported"
+                ),
+            }
+        )
     slope = args.get("slope")
     config = TriggerConfig(
-        mode=_enum(TriggerMode, args["mode"], op, "mode"),
+        mode=mode,
         source=args.get("source"),
         slope=_enum(TriggerSlope, slope, op, "slope") if slope is not None else None,
         level_v=args.get("level_v"),
@@ -178,11 +197,13 @@ def _h_decode_bus(scope: Scope, args: dict[str, Any]) -> ToolOutput:
     protocol = _enum(BusProtocol, args["protocol"], "decode_bus", "protocol")
     config = BusConfig(bus=int(args["bus"]), protocol=protocol, options=args.get("config", {}))
     frames = scope.decode_bus(config)
-    return ToolOutput(
-        structured={
-            "frames": [{"time": f.time, "label": f.label, "data": f.data} for f in frames]
-        }
-    )
+    structured: dict[str, Any] = {
+        "frames": [{"time": f.time, "label": f.label, "data": f.data} for f in frames]
+    }
+    if args.get("config"):
+        # Per-protocol options are accepted but not yet applied to the decoder.
+        structured["unimplemented"] = ["config"]
+    return ToolOutput(structured=structured)
 
 
 def _h_scpi_raw(scope: Scope, args: dict[str, Any]) -> ToolOutput:
@@ -229,7 +250,8 @@ def build_tool_specs(allow_raw_scpi: bool) -> list[ToolSpec]:
         ),
         ToolSpec(
             "configure_logic",
-            "Configure digital channels D0-D15 (enable, threshold, label).",
+            "Configure digital channels D0-D15 (enable, threshold). 'label' is accepted "
+            "but not yet applied (reported as unimplemented).",
             _obj(
                 {
                     "channels": {
@@ -247,7 +269,8 @@ def build_tool_specs(allow_raw_scpi: bool) -> list[ToolSpec]:
         ),
         ToolSpec(
             "configure_trigger",
-            "Configure the trigger (edge/pulse/pattern).",
+            "Configure the trigger. Only 'edge' mode is fully implemented; 'pulse'/'pattern' "
+            "return an 'unimplemented' status.",
             _obj(
                 {
                     "mode": {"type": "string", "enum": _enum_values(TriggerMode)},
@@ -300,7 +323,8 @@ def build_tool_specs(allow_raw_scpi: bool) -> list[ToolSpec]:
         ),
         ToolSpec(
             "decode_bus",
-            "Configure and read a hardware bus decode (I2C/SPI/UART/etc.).",
+            "Configure and read a hardware bus decode (I2C/SPI/UART/etc.). The 'config' "
+            "options object is accepted but not yet applied (reported as unimplemented).",
             _obj(
                 {
                     "bus": {"type": "integer", "minimum": 1, "maximum": 2},
