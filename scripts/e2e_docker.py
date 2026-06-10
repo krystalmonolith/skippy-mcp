@@ -201,7 +201,9 @@ def _run_sequence(opts: argparse.Namespace, mode: dict, mcp: MCP) -> list[str]:
     time.sleep(1.0)
 
     freq = _measure_retry(mcp, opts, "freq")
-    assert abs(freq - opts.freq) <= opts.freq_tol, f"freq {freq} Hz off {opts.freq}+-{opts.freq_tol}"
+    assert abs(freq - opts.freq) <= opts.freq_tol, (
+        f"freq {freq} Hz off {opts.freq}+-{opts.freq_tol}"
+    )
     checks.append(f"measure freq -> {freq:.1f} Hz")
 
     vpp = _measure_retry(mcp, opts, "vpp")
@@ -230,7 +232,10 @@ def _auth_negative(opts: argparse.Namespace, cfg_dir: Path, mode: dict) -> str:
         content='{"jsonrpc":"2.0","id":1,"method":"initialize","params":'
         '{"protocolVersion":"2024-11-05","capabilities":{},'
         '"clientInfo":{"name":"x","version":"1"}}}',
-        headers={"Content-Type": "application/json", "Accept": "application/json, text/event-stream"},
+        headers={
+            "Content-Type": "application/json",
+            "Accept": "application/json, text/event-stream",
+        },
         verify=verify,
         timeout=10.0,
         follow_redirects=True,
@@ -248,7 +253,9 @@ MODES = [
 
 
 def _parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     p.add_argument(
         "--resource",
         default=os.environ.get("SKIPPY_E2E_RESOURCE"),
@@ -262,9 +269,15 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--freq-tol", type=float, default=1000.0, help="Frequency tolerance (Hz).")
     p.add_argument("--vpp", type=float, default=5.0, help="Expected peak-to-peak (V).")
     p.add_argument("--vpp-tol", type=float, default=1.0, help="Vpp tolerance (V).")
-    p.add_argument("--call-timeout-ms", type=int, default=15000, help="Per-call X-Skippy-Timeout-Ms.")
-    p.add_argument("--autoscale-settle", type=float, default=4.0, help="Seconds after :AUToscale.")
-    p.add_argument("--ready-timeout", type=float, default=45.0, help="Startup readiness timeout (s).")
+    p.add_argument(
+        "--call-timeout-ms", type=int, default=15000, help="Per-call X-Skippy-Timeout-Ms."
+    )
+    p.add_argument(
+        "--autoscale-settle", type=float, default=4.0, help="Seconds to wait after :AUToscale."
+    )
+    p.add_argument(
+        "--ready-timeout", type=float, default=45.0, help="Startup readiness timeout (s)."
+    )
     opts = p.parse_args()
     if not opts.resource:
         p.error("--resource (or SKIPPY_E2E_RESOURCE) is required")
