@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "skippy-mcp"
+version = "0.3.0"
+description = "An MCP server for controlling Rigol oscilloscopes via SCPI/PyVISA."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+authors = [{ name = "Mark Deazley" }]
+keywords = ["mcp", "scpi", "oscilloscope", "rigol", "pyvisa", "instrument"]
+dependencies = [
+    "mcp>=1.2.0",
+    "pyvisa>=1.14",
+    "pyvisa-py>=0.7",
+    "pillow>=10",
+    "starlette>=0.37",
+    "uvicorn>=0.30",
+]
+
+[project.scripts]
+skippy-mcp = "skippy_mcp.mcp.server:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "mypy>=1.8",
+    "ruff>=0.4",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["src"]
+
+[[tool.mypy.overrides]]
+module = ["pyvisa.*", "mcp.*", "uvicorn.*"]
+ignore_missing_imports = true
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

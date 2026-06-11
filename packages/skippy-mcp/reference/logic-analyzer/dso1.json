@@ -1,0 +1,4 @@
+{
+  "_comment": "SkippyMCP target for the digital-stimulus E2E: Rigol MSO5204 at hostname 'dso1'. Raw-socket resource (single TCP port 5555, NAT/mirrored-friendly) -- preferred over VXI-11 '::INSTR' which negotiates a flaky secondary port. Pass to the driver/server with --config, or use the resource string directly with --resource.",
+  "resource": "TCPIP0::dso1::5555::SOCKET"
+}

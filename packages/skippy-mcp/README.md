@@ -1,0 +1,164 @@
+# SkippyMCP
+
+An [MCP](https://modelcontextprotocol.io) (Model Context Protocol) server for
+controlling Rigol oscilloscopes from an AI assistant. SkippyMCP translates MCP
+tool calls into [SCPI](https://en.wikipedia.org/wiki/Standard_Commands_for_Programmable_Instruments)
+commands over [PyVISA](https://pyvisa.readthedocs.io/), so an assistant can
+configure channels and triggers, arm captures, read measurements, grab
+screenshots, pull waveform data, and read protocol-decode results.
+
+The name is a nod to SCPI — pronounced *"skippy"* in the test-and-measurement
+world.
+
+![A 1 MHz, 1 Vpp sinc waveform captured live on an MSO5204 via SkippyMCP](docs/media/sinc-capture.png)
+
+*Live capture: an AI assistant configured the channel and trigger, ran the
+acquisition, measured it (Vpp 1.02 V, ~1 MHz), and pulled this screenshot — all
+through SkippyMCP's MCP tools.*
+
+- **Project name:** SkippyMCP
+- **Executable:** `skippy-mcp`
+- **Primary target:** Rigol **MSO5204** (MSO5000 series); a per-series dialect
+  layer keeps other Rigol DSO/MSO families addable.
+- **Status:** validated live against a real MSO5204; serves MCP over HTTP
+  (Streamable HTTP) with optional Bearer-key auth and TLS.
+
+## Install
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -e ".[dev]"
+```
+
+## Run
+
+The server speaks MCP over **HTTP** (Streamable HTTP) at `/mcp`:
+
+```bash
+skippy-mcp --host 192.168.1.50            # plain HTTP on 127.0.0.1:8080 (loopback only)
+skippy-mcp --host 192.168.1.50 --bind 0.0.0.0   # expose on the LAN (see security note)
+skippy-mcp --resource TCPIP0::scope::5555::SOCKET --port 9000
+skippy-mcp --config skippy.json           # API key / TLS / address from JSON
+```
+
+| Flag | Default | Effect |
+|------|---------|--------|
+| `--host` / `--resource` | — | Instrument address (CLI overrides the config file). |
+| `--bind` | `127.0.0.1` | HTTP bind address. Use `0.0.0.0` to expose on the LAN. |
+| `--port` | `8080` | HTTP port. |
+| `--timeout-ms` | 300000 | Per-I/O VISA timeout in ms. `0` = wait forever (handy for long single-shots). |
+| `--no-reset` | reset on | Skip `*RST` on connect; leave the setup untouched. |
+| `--allow-raw-scpi` | off | Register the `scpi_raw` escape-hatch tool. |
+| `--config <path>` | none | Optional JSON config (below). |
+
+### Security defaults
+
+- **Binds loopback (`127.0.0.1`) by default.** Pass `--bind 0.0.0.0` to expose the
+  server on the network. If you do so **without** an `api_key`, the server starts but
+  prints a loud warning — anyone who can reach the port can control the instrument.
+- **DNS-rebinding protection is always on.** Requests are accepted only if their `Host`
+  header matches the bind address or localhost (any port). Add other names a client may
+  use (a LAN hostname, or anything when bound to `0.0.0.0`) via `allowed_hosts`; add
+  browser `Origin` values via `allowed_origins`.
+- **An `api_key` over plain HTTP is sent in cleartext** — the server warns; enable `tls`
+  for confidentiality.
+
+### Per-request timeout
+
+Each tool call uses the `--timeout-ms` value as its per-I/O timeout, so a hung query (e.g.
+the scope is busy) surfaces an actionable timeout error naming the last command rather than
+hanging. A client may override the timeout for a single call with the
+`X-Skippy-Timeout-Ms` request header (`0` = wait forever) — useful when arming a long
+single-shot capture. This header is a SkippyMCP extension, not part of the MCP spec.
+
+### Config file (`--config`)
+
+All keys optional. No file → plain HTTP, no auth.
+
+```json
+{
+  "host": "192.168.1.50",
+  "resource": "TCPIP0::192.168.1.50::5555::SOCKET",
+  "api_key": "your-bearer-token",
+  "tls": { "cert": "/path/cert.pem", "key": "/path/key.pem" },
+  "allowed_hosts": ["scope-host.lan:*"],
+  "allowed_origins": ["https://app.example.com"]
+}
+```
+
+- `api_key` set → require `Authorization: Bearer <key>` on every request.
+- `tls` set → serve HTTPS directly (no reverse proxy needed).
+- `allowed_hosts` / `allowed_origins` → extra `Host` / `Origin` values accepted by the
+  DNS-rebinding guard (localhost and the bind address are always accepted; a `host:*`
+  entry matches any port). Needed for access via a LAN hostname or when bound to `0.0.0.0`.
+- Address precedence: `--resource` > `--host` > JSON `resource` > JSON `host`.
+
+The startup banner reports the active mode (TLS / API key) and prints an example
+smoke-test `curl`.
+
+Ready-to-edit examples for each mode live in
+[`examples/json-configuration/`](examples/json-configuration/):
+
+| File | Mode |
+|------|------|
+| [`http-apikey.json`](examples/json-configuration/http-apikey.json) | HTTP + Bearer API key |
+| [`https-tls.json`](examples/json-configuration/https-tls.json) | HTTPS/TLS, no auth |
+| [`https-tls-apikey.json`](examples/json-configuration/https-tls-apikey.json) | HTTPS/TLS + Bearer API key |
+
+### Generating a self-signed TLS certificate
+
+For local/LAN testing you can make a self-signed cert and key. Include the
+address you'll connect to in the `subjectAltName` so clients can verify it:
+
+```bash
+openssl req -x509 -newkey rsa:2048 -nodes -days 365 \
+  -keyout key.pem -out cert.pem \
+  -subj "/CN=localhost" \
+  -addext "subjectAltName=IP:127.0.0.1,DNS:localhost"
+```
+
+Point `tls.cert` / `tls.key` at the resulting files. Clients that don't already
+trust the cert can be told to with `SSL_CERT_FILE=cert.pem`. In Docker, the cert
+and key must be **readable by the container's non-root user** (e.g. `chmod 644`).
+For production, prefer a CA-issued certificate over a self-signed one.
+
+## Docker
+
+```bash
+docker build -t skippy-mcp:latest .
+# --network host reaches a link-local / same-LAN instrument. Bind 0.0.0.0 so the API
+# is reachable from outside the container (it defaults to loopback); pair with an
+# api_key in --config when doing so:
+docker run --rm --network host skippy-mcp:latest \
+  --resource TCPIP0::<scope-ip>::5555::SOCKET --port 8080 --bind 0.0.0.0
+```
+
+The image is pure-Python (`pyvisa-py`) and runs as a non-root user.
+
+## Tools
+
+`get_identity`, `configure_channel`, `configure_logic`, `configure_trigger`,
+`capture`, `measure`, `screenshot`, `read_waveform`, `decode_bus`, and
+(when `--allow-raw-scpi`) `scpi_raw`.
+
+## Develop / test
+
+```bash
+.venv/bin/pytest          # full suite, no hardware (uses the simulator)
+.venv/bin/mypy            # strict type-check
+.venv/bin/ruff check
+```
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [Initial design](claude-design/20260605A-skippy-mcp-initial-design.md) | Overview, architecture, tool surface, compatible models, prior art. |
+| [Detailed design](claude-design/20260609A-skippy-mcp-detailed-design.md) | Layered architecture, transport interface + simulator, dialect layer, error model, tool schemas. |
+| [Implementation plan](claude-design/20260609B-skippy-mcp-implementation-plan.md) | Phased build plan (hardware-free through Phase 6). |
+| [Validation summary](claude-design/20260609C-skippy-mcp-validation-summary.md) | v0.1.0 test results + live MSO5204 validation. |
+| [HTTP transport design](claude-design/20260609D-skippy-mcp-http-transport-design.md) | HTTP transport, config file, API-key auth, TLS (v0.2.0). |
+
+## License
+
+[MIT](LICENSE) © 2026 Mark Deazley

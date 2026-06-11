@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Virtual environment
+.venv/
+
+# Tooling caches
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# Editor / OS
+*.swp
+.DS_Store
+
+# Local config (may hold API keys / TLS paths) and TLS material
+skippy.json
+*.local.json
+config*.json
+*.pem
+*.key

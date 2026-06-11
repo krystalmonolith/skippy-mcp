@@ -1,0 +1,8 @@
+{
+  "host": "192.168.1.50",
+  "api_key": "change-me-example-key",
+  "tls": {
+    "cert": "/cfg/dev-cert.pem",
+    "key": "/cfg/dev-key.pem"
+  }
+}
