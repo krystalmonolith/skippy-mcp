@@ -10,8 +10,10 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      matrix:
-        package: [rig-contract, stimpy-mcp]
+        # NOTE: skippy-mcp does not import rig-contract; the shared-dep install
+        # step below is a harmless no-op for it. Each package's nested .github/
+        # workflows are inert (GitHub only runs root workflows).
+        package: [rig-contract, stimpy-mcp, skippy-mcp]
     defaults:
       run:
         working-directory: packages/${{ matrix.package }}
