@@ -1,12 +1,21 @@
 name: release
 
+# Builds and publishes the SkippyMCP .deb + Docker image. SkippyMCP is the
+# release artifact of this monorepo; stimpy-mcp/rig-contract are not published
+# here. Triggered by a v* tag (cuts a GitHub Release) or run manually.
+
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
 
 permissions:
   contents: write   # create GitHub Releases
   packages: write   # push images to GHCR
+
+defaults:
+  run:
+    working-directory: packages/skippy-mcp
 
 jobs:
   deb:
@@ -18,11 +27,20 @@ jobs:
           python-version: "3.12"
       - name: Build .deb
         run: PYTHON=python ./packaging/build-deb.sh
+      # `files:`/`path:` below are repo-root-relative (defaults.working-directory
+      # only applies to `run:` steps, not to actions).
       - name: Publish .deb to the release
+        if: github.ref_type == 'tag'
         uses: softprops/action-gh-release@v3
         with:
-          files: build/deb/*.deb
+          files: packages/skippy-mcp/build/deb/*.deb
           generate_release_notes: true
+      - name: Upload .deb artifact (manual runs)
+        if: github.ref_type != 'tag'
+        uses: actions/upload-artifact@v4
+        with:
+          name: skippy-mcp-deb
+          path: packages/skippy-mcp/build/deb/*.deb
 
   docker:
     runs-on: ubuntu-latest
@@ -35,13 +53,19 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Derive version from tag
+      - name: Derive version
         id: ver
-        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            v="${GITHUB_REF_NAME#v}"
+          else
+            v="$(grep -m1 '^version = ' pyproject.toml | sed -E 's/.*"([^"]+)".*/\1/')"
+          fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
       - name: Build and push image
         uses: docker/build-push-action@v7
         with:
-          context: .
+          context: packages/skippy-mcp
           push: true
           tags: |
             ghcr.io/krystalmonolith/skippy-mcp:${{ steps.ver.outputs.version }}
