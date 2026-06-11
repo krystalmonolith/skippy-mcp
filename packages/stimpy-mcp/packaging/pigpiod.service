@@ -1,0 +1,17 @@
+# pigpio daemon — provides the DMA wave engine StimpyMCP drives.
+# Install to /etc/systemd/system/pigpiod.service (or use the distro's stock unit).
+#   -g  : run in the foreground (systemd manages it)
+#   -s 1: 1 us sample tick -> max ~500 kHz D0, higher CPU. Use -s 2/5 for less CPU.
+# The daemon binds loopback only by default (the MCP server is a local client).
+[Unit]
+Description=pigpio daemon (DMA GPIO wave engine)
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/pigpiod -g -s 1
+ExecStop=/bin/systemctl kill pigpiod
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

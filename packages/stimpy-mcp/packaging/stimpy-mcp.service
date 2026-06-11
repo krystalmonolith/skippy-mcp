@@ -1,0 +1,30 @@
+# StimpyMCP server — unprivileged client of pigpiod.
+# Install to /etc/systemd/system/stimpy-mcp.service, then:
+#   sudo systemctl enable --now stimpy-mcp
+# Edit User and the bind address/config path for your Pi.
+[Unit]
+Description=StimpyMCP GPIO digital-stimulus MCP server
+After=pigpiod.service network-online.target
+Requires=pigpiod.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=stimpy
+Group=stimpy
+# Bind the Pi's hotspot/LAN IP; api_key + TLS come from the config (mode 0600).
+ExecStart=/opt/stimpy-mcp/venv/bin/stimpy-mcp \
+    --bind 192.168.137.74 \
+    --config /etc/stimpy-mcp/config.json \
+    --allow-builtin-patterns
+Restart=on-failure
+RestartSec=2
+# Hardening (the server needs no privileges; pigpiod owns the hardware):
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadOnlyPaths=/etc/stimpy-mcp
+
+[Install]
+WantedBy=multi-user.target

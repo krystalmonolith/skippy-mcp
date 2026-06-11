@@ -1,0 +1,14 @@
+{
+  "_comment": "Copy to /etc/stimpy-mcp/config.json (mode 0600). CLI flags override these. pin_map is REQUIRED.",
+  "pin_map": {
+    "data": [4, 5, 6, 12, 13, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26],
+    "sync": 27
+  },
+  "api_key": "replace-with-a-long-random-token",
+  "tls": { "cert": "/etc/stimpy-mcp/cert.pem", "key": "/etc/stimpy-mcp/key.pem" },
+  "pigpio_host": "localhost",
+  "pigpio_port": 8888,
+  "default_clock_rate_hz": 1000.0,
+  "allow_builtin_patterns": true,
+  "allowed_hosts": ["rigelpi:*", "rigelpi.local:*"]
+}

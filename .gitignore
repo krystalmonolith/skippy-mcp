@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# Secrets / local config — NEVER commit
+*.pem
+*.key
+config*.json
+*.local.json
+!**/examples/*.example.json
+
+# OS / editor
+.DS_Store
+*.swp
