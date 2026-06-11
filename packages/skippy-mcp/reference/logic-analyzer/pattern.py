@@ -1,7 +1,7 @@
 """Compatibility shim — the canonical contract now lives in ``rig_contract``.
 
 The pin map and the ``PATTERN`` test vector used to be defined here. In the
-bench-mcp monorepo they are the shared ``rig_contract`` package (the rig "IDL"),
+skippy-mcp monorepo they are the shared ``rig_contract`` package (the rig "IDL"),
 so there is exactly one source of truth. These reference scripts predate the
 split and import ``pattern``; this thin re-export keeps them runnable without
 duplicating the data.

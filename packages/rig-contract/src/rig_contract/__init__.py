@@ -92,7 +92,9 @@ def counter_frames(bits: int = CHANNEL_COUNT) -> list[int]:
     return list(range(1 << bits))
 
 
-def counter_sync_frames(bits: int = CHANNEL_COUNT, sync_period: int = 1 << CHANNEL_COUNT) -> list[int]:
+def counter_sync_frames(
+    bits: int = CHANNEL_COUNT, sync_period: int = 1 << CHANNEL_COUNT
+) -> list[int]:
     """Frame indices where SYNC pulses for a counter buffer (every ``sync_period``)."""
     if sync_period < 1:
         raise ValueError(f"sync_period must be >= 1, got {sync_period}")
