@@ -55,13 +55,13 @@ class PyVisaTransport:
     def write(self, command: str) -> None:
         try:
             self._resource.write(command)
-        except VisaIOError as exc:
+        except (VisaIOError, OSError) as exc:
             self._raise_for(exc, command)
 
     def query(self, command: str) -> str:
         try:
             return str(self._resource.query(command)).strip()
-        except VisaIOError as exc:
+        except (VisaIOError, OSError) as exc:
             self._raise_for(exc, command)
 
     def query_binary(self, command: str) -> bytes:
@@ -71,7 +71,7 @@ class PyVisaTransport:
                 bytes,
                 self._resource.query_binary_values(command, datatype="B", container=bytes),
             )
-        except VisaIOError as exc:
+        except (VisaIOError, OSError) as exc:
             self._raise_for(exc, command)
 
     def set_timeout(self, timeout_ms: int | None) -> None:
@@ -82,9 +82,18 @@ class PyVisaTransport:
     def close(self) -> None:
         self._resource.close()
 
-    def _raise_for(self, exc: VisaIOError, command: str) -> Never:
-        if _is_timeout(exc):
+    def _raise_for(self, exc: VisaIOError | OSError, command: str) -> Never:
+        if isinstance(exc, VisaIOError) and _is_timeout(exc):
             raise InstrumentTimeoutError(
                 "instrument_io", command=command, timeout_ms=self._timeout_ms
             ) from exc
-        raise ConnectionFailedError(command, reason=str(exc)) from exc
+        # Includes raw socket OSErrors (e.g. ConnectionRefusedError raised by
+        # pyvisa-py when the scope is off): surface an actionable connect error
+        # rather than letting the traceback escape and crash the server.
+        raise ConnectionFailedError(
+            self._resource_name(),
+            reason=f"{type(exc).__name__}: {exc} (during {command!r})",
+        ) from exc
+
+    def _resource_name(self) -> str:
+        return str(self._resource.resource_name)

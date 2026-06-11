@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from skippy_mcp.transport.base import Transport
 from skippy_mcp.transport.simulated import SimulatedTransport
 
@@ -87,3 +89,24 @@ def test_close_marks_closed() -> None:
     sim = SimulatedTransport()
     sim.close()
     assert sim.closed
+
+
+def test_socket_error_becomes_actionable_connect_error() -> None:
+    """A raw socket failure (scope off) surfaces as an actionable ConnectionFailedError,
+    not an uncaught ConnectionRefusedError traceback."""
+    from skippy_mcp.core.errors import ConnectionFailedError
+    from skippy_mcp.transport.pyvisa_transport import PyVisaTransport
+
+    class _DeadResource:
+        resource_name = "TCPIP0::127.0.0.1::5555::SOCKET"
+
+        def query(self, command: str) -> str:
+            raise ConnectionRefusedError(111, "Connection refused")
+
+    transport = PyVisaTransport(_DeadResource(), timeout_ms=3000)
+    with pytest.raises(ConnectionFailedError) as excinfo:
+        transport.query("*IDN?")
+    message = str(excinfo.value)
+    assert message.startswith("connect:")
+    assert "Check:" in message
+    assert "Connection refused" in message

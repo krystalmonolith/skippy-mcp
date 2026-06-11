@@ -76,7 +76,9 @@ def build_mcp_server(
     Each call applies its effective per-I/O timeout (the ``X-Skippy-Timeout-Ms``
     header override, else ``default_timeout_ms``) for the duration of the call.
     """
-    server: Server = Server("skippy-mcp")
+    from skippy_mcp import __version__
+
+    server: Server = Server("skippy-mcp", version=__version__)
     by_name = {spec.name: spec for spec in specs}
     instrument_lock = anyio.Lock()
 
@@ -280,14 +282,22 @@ def build_banner(config: ServerConfig, model: str, series: str, n_tools: int) ->
 
 def main() -> None:
     """Console-script entry point: connect, then serve MCP over HTTP."""
+    import sys
+
     logging.basicConfig(level=logging.INFO)
     config = parse_args_or_exit()
-    transport = open_transport(config)
-    scope = establish(
-        transport,
-        reset_on_connect=config.reset_on_connect,
-        default_timeout_ms=config.timeout_ms,
-    )
+    try:
+        transport = open_transport(config)
+        scope = establish(
+            transport,
+            reset_on_connect=config.reset_on_connect,
+            default_timeout_ms=config.timeout_ms,
+        )
+    except SkippyError as exc:
+        # Scope unreachable/off, unsupported model, etc. — emit the actionable
+        # message and exit cleanly instead of dumping a stack trace.
+        print(str(exc), file=sys.stderr)
+        raise SystemExit(1) from exc
     specs = build_tool_specs(config.allow_raw_scpi)
     server = build_mcp_server(scope, specs, default_timeout_ms=config.timeout_ms)
     app = build_app(server, config, scope=scope)
