@@ -6,8 +6,7 @@
   },
   "api_key": "replace-with-a-long-random-token",
   "tls": { "cert": "/etc/stimpy-mcp/cert.pem", "key": "/etc/stimpy-mcp/key.pem" },
-  "pigpio_host": "localhost",
-  "pigpio_port": 8888,
+  "gpiochip": 0,
   "default_clock_rate_hz": 1000.0,
   "allow_builtin_patterns": true,
   "allowed_hosts": ["rigelpi:*", "rigelpi.local:*"]
