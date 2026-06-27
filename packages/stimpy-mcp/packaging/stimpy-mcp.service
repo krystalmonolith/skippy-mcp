@@ -20,9 +20,14 @@ DeviceAllow=/dev/gpiochip0 rw
 # service-private state dir (auto-created/owned by systemd, RW under ProtectSystem).
 StateDirectory=stimpy-mcp
 WorkingDirectory=/var/lib/stimpy-mcp
-# Bind the Pi's LAN IP; api_key (+ optional TLS) come from the config (mode 0600).
+# Bind all interfaces (0.0.0.0): robust to DHCP lease changes (a literal IP that
+# drifts off the interface => bind failure => crash-loop) and auto-covers eth0
+# when the bench net returns. Safe here because api_key auth + the config's
+# DNS-rebinding allowed_hosts gate access; api_key (+ optional TLS) live in the
+# config (mode 0600). To confine the server to one interface, set a literal IP.
 ExecStart=/opt/stimpy-mcp/venv/bin/stimpy-mcp \
-    --bind 192.168.137.74 \
+    --bind 0.0.0.0 \
+    --port 8080 \
     --config /etc/stimpy-mcp/config.json \
     --allow-builtin-patterns
 Restart=on-failure
