@@ -137,9 +137,107 @@ The image is pure-Python (`pyvisa-py`) and runs as a non-root user.
 
 ## Tools
 
-`get_identity`, `configure_channel`, `configure_logic`, `configure_trigger`,
-`capture`, `measure`, `screenshot`, `read_waveform`, `decode_bus`, and
-(when `--allow-raw-scpi`) `scpi_raw`.
+Required arguments are **bold**. Enum values are the client-facing names.
+
+| Tool | Arguments | Returns |
+|------|-----------|---------|
+| `get_identity` | — | `manufacturer`, `model`, `serial`, `firmware`, `dialect` |
+| `configure_channel` | **`channel`** (1–4), `enabled`, `scale_v_per_div`, `offset_v`, `coupling` (`dc`/`ac`/`gnd`), `bandwidth_limit`, `probe_ratio` | `{status, channel}` |
+| `configure_logic` | **`channels`** (`[0..15]`), `enabled`, `threshold_v`, `label` | `{status, channels}` |
+| `configure_trigger` | **`mode`** (`edge`/`pulse`/`pattern`), `source`, `slope` (`rising`/`falling`/`either`), `level_v`, `pattern` | `{status, mode}` (only `edge` is fully implemented) |
+| `capture` | **`action`** (`run`/`stop`/`single`) | `{status, action}` |
+| `measure` | **`type`** (`vpp`/`vrms`/`freq`/`period`/`duty`/`rise`/`fall`/`delay`/`phase`), **`source`** (`CH1..CH4`), `source2` | `{type, source, value, unit}` |
+| `screenshot` | — | PNG image (MCP image content, base64) |
+| `read_waveform` | **`source`** (`CH1..CH4`/`D0..D15`), `mode` (`normal`/`raw`/`max`), `max_points` | `{source, x_unit, y_unit, x_increment, x_origin, values[]}` |
+| `decode_bus` | **`bus`** (1–2), **`protocol`** (`i2c`/`spi`/`uart`/`parallel`/`can`/`lin`), `config` | `{frames[]}` |
+| `scpi_raw` *(gated: `--allow-raw-scpi`)* | **`command`**, `expect_response` | `{response}` |
+
+## Example MCP calls
+
+Transport is **MCP Streamable HTTP** at `/mcp`. After `initialize`, every request
+carries the `Mcp-Session-Id` from the initialize response headers. Responses are
+SSE — the JSON-RPC object is on the `data:` line; each tool result returns the
+JSON document shown below in `result.content[0]` (`screenshot` returns an image
+content block instead).
+
+```bash
+URL=http://127.0.0.1:8080/mcp
+HJSON='-H Content-Type:application/json -H Accept:application/json,text/event-stream'
+# (add  -H "Authorization: Bearer $KEY"  to every call when an api_key is set)
+
+# initialize — capture the session id from the response headers
+curl -sS -L -D /tmp/h $HJSON "$URL" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"demo","version":"1.0"}}}'
+SID=$(awk -F': ' 'tolower($1)=="mcp-session-id"{print $2}' /tmp/h | tr -d '\r')
+HSID="-H Mcp-Session-Id:$SID"
+curl -sS -L $HJSON $HSID "$URL" -d '{"jsonrpc":"2.0","method":"notifications/initialized"}'
+```
+
+Each tool call is a `tools/call` POST with the same headers, e.g.:
+
+```bash
+curl -sS -L $HJSON $HSID "$URL" \
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"get_identity","arguments":{}}}'
+```
+
+The `arguments` object and the returned JSON for each tool:
+
+**get_identity** — `{}` →
+```json
+{ "manufacturer": "RIGOL TECHNOLOGIES", "model": "MSO5204",
+  "serial": "MS5Axxxxxxxxx", "firmware": "00.01.03.02.02", "dialect": "MSO5000" }
+```
+
+**configure_channel** — `{"channel":1,"enabled":true,"scale_v_per_div":0.5,"coupling":"dc","probe_ratio":10}` →
+```json
+{ "status": "ok", "channel": 1 }
+```
+
+**configure_logic** — `{"channels":[0,1,2,3],"enabled":true,"threshold_v":1.4}` →
+```json
+{ "status": "ok", "channels": [0, 1, 2, 3] }
+```
+
+**configure_trigger** — `{"mode":"edge","source":"CH1","slope":"rising","level_v":0.0}` →
+```json
+{ "status": "ok", "mode": "edge" }
+```
+
+**capture** — `{"action":"single"}` →
+```json
+{ "status": "ok", "action": "single" }
+```
+
+**measure** — `{"type":"freq","source":"CH1"}` →
+```json
+{ "type": "freq", "source": "CH1", "value": 1000000.0, "unit": "Hz" }
+```
+
+**screenshot** — `{}` → an MCP **image** content block (base64 PNG), e.g.
+`{ "type": "image", "mimeType": "image/png", "data": "iVBORw0KGgo..." }`
+
+**read_waveform** — `{"source":"CH1","mode":"normal","max_points":1200}` →
+```json
+{ "source": "CH1", "x_unit": "s", "y_unit": "V",
+  "x_increment": 4e-10, "x_origin": -2.0e-7,
+  "values": [0.001, 0.004, 0.010, "...1200 points..."] }
+```
+
+**decode_bus** — `{"bus":1,"protocol":"i2c"}` →
+```json
+{ "frames": [ { "time": 1.2e-5, "label": "ADDR", "data": "0x50" },
+              { "time": 1.8e-5, "label": "DATA", "data": "0xA3" } ] }
+```
+
+**scpi_raw** *(requires `--allow-raw-scpi`)* — `{"command":"*IDN?","expect_response":true}` →
+```json
+{ "response": "RIGOL TECHNOLOGIES,MSO5204,MS5Axxxxxxxxx,00.01.03.02.02" }
+```
+
+> Tools that accept forward-compatible options not yet sent to the scope
+> (`configure_logic`'s `label`, `decode_bus`'s `config`, non-`edge` triggers)
+> echo an `"unimplemented": [...]` / `"status": "unimplemented"` field rather
+> than silently ignoring the request.
 
 ## Develop / test
 
