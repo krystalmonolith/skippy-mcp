@@ -12,6 +12,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 
 from skippy_mcp.core.enums import (
+    BusProtocol,
     CaptureAction,
     MeasurementType,
     TriggerMode,
@@ -217,7 +218,36 @@ class Scope:
             raise ValidationError(
                 "decode_bus", parameter="bus", value=config.bus, requirement="1 or 2"
             )
+        i2c_only = (
+            config.scl_source,
+            config.sda_source,
+            config.scl_threshold_v,
+            config.sda_threshold_v,
+            config.address_mode,
+        )
+        if config.protocol is not BusProtocol.I2C and any(v is not None for v in i2c_only):
+            raise ValidationError(
+                "decode_bus",
+                parameter="protocol",
+                value=config.protocol.value,
+                requirement="i2c when setting scl/sda source, threshold, or address_mode",
+            )
+        # Order matches what was verified on the MSO5204: mode, then sources,
+        # thresholds, address mode, format, then enable the decode row, then read.
         self._t.write(self._d.bus_protocol(config.bus, config.protocol))
+        if config.protocol is BusProtocol.I2C:
+            if config.scl_source is not None:
+                self._t.write(self._d.bus_iic_scl_source(config.bus, config.scl_source))
+            if config.sda_source is not None:
+                self._t.write(self._d.bus_iic_sda_source(config.bus, config.sda_source))
+            if config.scl_threshold_v is not None:
+                self._t.write(self._d.bus_iic_scl_threshold(config.bus, config.scl_threshold_v))
+            if config.sda_threshold_v is not None:
+                self._t.write(self._d.bus_iic_sda_threshold(config.bus, config.sda_threshold_v))
+            if config.address_mode is not None:
+                self._t.write(self._d.bus_iic_address_mode(config.bus, config.address_mode))
+        if config.fmt is not None:
+            self._t.write(self._d.bus_format(config.bus, config.fmt))
         self._t.write(self._d.bus_enable(config.bus, True))
         self._check_errors("decode_bus")
         raw = self._t.query(self._d.bus_decode_data(config.bus)).strip()

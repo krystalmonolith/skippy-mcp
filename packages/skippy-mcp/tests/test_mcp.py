@@ -130,6 +130,30 @@ def test_decode_bus_without_config_has_no_unimplemented(scope: Scope) -> None:
     assert "unimplemented" not in out.structured
 
 
+def test_decode_bus_applies_typed_i2c_fields() -> None:
+    sim = SimulatedTransport()
+    scope = establish(sim, reset_on_connect=False)
+    out = _spec("decode_bus").handler(
+        scope,
+        {
+            "bus": 1,
+            "protocol": "i2c",
+            "scl_source": "D0",
+            "sda_source": "D1",
+            "scl_threshold_v": 1.4,
+            "address_mode": "normal",
+            "format": "hex",
+        },
+    )
+    assert out.structured is not None
+    assert "unimplemented" not in out.structured  # typed fields are applied, not stubbed
+    assert ":BUS1:IIC:SCLK:SOURce D0" in sim.history
+    assert ":BUS1:IIC:SDA:SOURce D1" in sim.history
+    assert ":BUS1:IIC:SCLK:THReshold 1.4" in sim.history
+    assert ":BUS1:IIC:ADDRess NORMal" in sim.history
+    assert ":BUS1:FORMat HEX" in sim.history
+
+
 # -- output conversion ----------------------------------------------------
 def test_convert_structured_output_returns_dict() -> None:
     assert convert_output(ToolOutput(structured={"a": 1})) == {"a": 1}

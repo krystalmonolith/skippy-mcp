@@ -84,6 +84,30 @@ class BusProtocol(ScpiEnum):
     LIN = ("lin", "LIN")
 
 
+class I2cAddressMode(ScpiEnum):
+    """How an I2C decode reports the address byte.
+
+    ``RW`` folds the read/write bit into the reported address; ``NORMAL`` reports
+    the 7/10-bit address only. SCPI tokens verified on an MSO5204.
+    """
+
+    NORMAL = ("normal", "NORMal")
+    RW = ("rw", "RW")
+
+
+class BusFormat(ScpiEnum):
+    """Radix the bus decoder uses for displayed/returned data.
+
+    SCPI tokens verified on an MSO5204 — note the scope rejects the spelled-out
+    ``DECimal``/``BINary`` forms, so the short tokens are the correct ones.
+    """
+
+    HEX = ("hex", "HEX")
+    DEC = ("dec", "DEC")
+    BIN = ("bin", "BIN")
+    ASCII = ("ascii", "ASCii")
+
+
 class ImageFormat(ScpiEnum):
     """Screenshot image format."""
 

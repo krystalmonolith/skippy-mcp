@@ -15,9 +15,11 @@ from typing import Any, TypeVar
 
 from skippy_mcp.core.enums import (
     BandwidthLimit,
+    BusFormat,
     BusProtocol,
     CaptureAction,
     Coupling,
+    I2cAddressMode,
     ImageFormat,
     MeasurementType,
     TriggerMode,
@@ -195,13 +197,30 @@ def _h_read_waveform(scope: Scope, args: dict[str, Any]) -> ToolOutput:
 
 def _h_decode_bus(scope: Scope, args: dict[str, Any]) -> ToolOutput:
     protocol = _enum(BusProtocol, args["protocol"], "decode_bus", "protocol")
-    config = BusConfig(bus=int(args["bus"]), protocol=protocol, options=args.get("config", {}))
+    address_mode = (
+        _enum(I2cAddressMode, args["address_mode"], "decode_bus", "address_mode")
+        if "address_mode" in args
+        else None
+    )
+    fmt = _enum(BusFormat, args["format"], "decode_bus", "format") if "format" in args else None
+    config = BusConfig(
+        bus=int(args["bus"]),
+        protocol=protocol,
+        scl_source=args.get("scl_source"),
+        sda_source=args.get("sda_source"),
+        scl_threshold_v=args.get("scl_threshold_v"),
+        sda_threshold_v=args.get("sda_threshold_v"),
+        address_mode=address_mode,
+        fmt=fmt,
+        options=args.get("config", {}),
+    )
     frames = scope.decode_bus(config)
     structured: dict[str, Any] = {
         "frames": [{"time": f.time, "label": f.label, "data": f.data} for f in frames]
     }
     if args.get("config"):
-        # Per-protocol options are accepted but not yet applied to the decoder.
+        # The free-form `config` passthrough is for keys not yet first-class;
+        # the typed scl/sda/threshold/address_mode/format fields ARE applied.
         structured["unimplemented"] = ["config"]
     return ToolOutput(structured=structured)
 
@@ -323,12 +342,20 @@ def build_tool_specs(allow_raw_scpi: bool) -> list[ToolSpec]:
         ),
         ToolSpec(
             "decode_bus",
-            "Configure and read a hardware bus decode (I2C/SPI/UART/etc.). The 'config' "
-            "options object is accepted but not yet applied (reported as unimplemented).",
+            "Configure and read a hardware bus decode. For I2C, assign the SCL/SDA "
+            "source channels, decode thresholds, and address mode, then read the "
+            "decoded frames. The free-form 'config' object is a passthrough for keys "
+            "not yet first-class (reported as unimplemented).",
             _obj(
                 {
                     "bus": {"type": "integer", "minimum": 1, "maximum": 2},
                     "protocol": {"type": "string", "enum": _enum_values(BusProtocol)},
+                    "scl_source": {"type": "string", "pattern": source_pattern},
+                    "sda_source": {"type": "string", "pattern": source_pattern},
+                    "scl_threshold_v": {"type": "number"},
+                    "sda_threshold_v": {"type": "number"},
+                    "address_mode": {"type": "string", "enum": _enum_values(I2cAddressMode)},
+                    "format": {"type": "string", "enum": _enum_values(BusFormat)},
                     "config": {"type": "object", "additionalProperties": {"type": "string"}},
                 },
                 ["bus", "protocol"],

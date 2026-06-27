@@ -11,8 +11,10 @@ from dataclasses import dataclass, field
 
 from skippy_mcp.core.enums import (
     BandwidthLimit,
+    BusFormat,
     BusProtocol,
     Coupling,
+    I2cAddressMode,
     ImageFormat,
     MeasurementType,
     TriggerMode,
@@ -129,8 +131,21 @@ class DecodedFrame:
 
 @dataclass(frozen=True, slots=True)
 class BusConfig:
-    """Desired bus-decode configuration."""
+    """Desired bus-decode configuration.
+
+    The ``scl_*``/``sda_*``/``address_mode`` fields are I2C-specific and applied
+    only when ``protocol is BusProtocol.I2C``; ``fmt`` (output radix) applies to
+    any protocol. ``None`` means "leave the decoder's current value unchanged".
+    ``options`` is a forward-compat passthrough for keys not yet first-class
+    (reported as ``unimplemented`` rather than silently dropped).
+    """
 
     bus: int
     protocol: BusProtocol
+    scl_source: str | None = None
+    sda_source: str | None = None
+    scl_threshold_v: float | None = None
+    sda_threshold_v: float | None = None
+    address_mode: I2cAddressMode | None = None
+    fmt: BusFormat | None = None
     options: dict[str, str] = field(default_factory=dict)

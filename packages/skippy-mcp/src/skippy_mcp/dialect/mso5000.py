@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from skippy_mcp.core.enums import BusProtocol
+from skippy_mcp.core.enums import BusFormat, BusProtocol, I2cAddressMode
 from skippy_mcp.core.models import DeviceLimits, IdnInfo
 from skippy_mcp.dialect.base import Dialect, register
 
@@ -49,3 +49,24 @@ class MSO5000Dialect(Dialect):
 
     def bus_decode_data(self, bus: int) -> str:
         return f":BUS{bus}:DATA?"
+
+    def bus_format(self, bus: int, fmt: BusFormat) -> str:
+        return f":BUS{bus}:FORMat {fmt.scpi}"
+
+    # I2C decoder setup. NOTE the source spelling: decode uses SCLK/SDA *with*
+    # :SOURce (verified on an MSO5204) — distinct from the trigger subsystem,
+    # which uses :TRIGger:IIC:SCL/:SDA with no suffix. Do not "unify" these.
+    def bus_iic_scl_source(self, bus: int, source: str) -> str:
+        return f":BUS{bus}:IIC:SCLK:SOURce {self.scpi_source(source)}"
+
+    def bus_iic_sda_source(self, bus: int, source: str) -> str:
+        return f":BUS{bus}:IIC:SDA:SOURce {self.scpi_source(source)}"
+
+    def bus_iic_scl_threshold(self, bus: int, threshold_v: float) -> str:
+        return f":BUS{bus}:IIC:SCLK:THReshold {threshold_v:g}"
+
+    def bus_iic_sda_threshold(self, bus: int, threshold_v: float) -> str:
+        return f":BUS{bus}:IIC:SDA:THReshold {threshold_v:g}"
+
+    def bus_iic_address_mode(self, bus: int, mode: I2cAddressMode) -> str:
+        return f":BUS{bus}:IIC:ADDRess {mode.scpi}"

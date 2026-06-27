@@ -5,9 +5,11 @@ from __future__ import annotations
 import pytest
 
 from skippy_mcp.core.enums import (
+    BusFormat,
     BusProtocol,
     CaptureAction,
     Coupling,
+    I2cAddressMode,
     ImageFormat,
     MeasurementType,
     TriggerMode,
@@ -132,6 +134,44 @@ def test_decode_bus_parses_frames(scope: Scope) -> None:
 def test_decode_bus_rejects_bad_bus(scope: Scope) -> None:
     with pytest.raises(ValidationError):
         scope.decode_bus(BusConfig(bus=9, protocol=BusProtocol.I2C))
+
+
+def test_decode_bus_applies_i2c_config() -> None:
+    sim = SimulatedTransport()
+    scope = establish(sim, reset_on_connect=False)
+    scope.decode_bus(
+        BusConfig(
+            bus=1,
+            protocol=BusProtocol.I2C,
+            scl_source="D0",
+            sda_source="D1",
+            scl_threshold_v=1.4,
+            sda_threshold_v=1.4,
+            address_mode=I2cAddressMode.NORMAL,
+            fmt=BusFormat.HEX,
+        )
+    )
+    h = sim.history
+    # SCPI spellings verified live on an MSO5204 (decode uses SCLK/SDA + :SOURce).
+    assert ":BUS1:IIC:SCLK:SOURce D0" in h
+    assert ":BUS1:IIC:SDA:SOURce D1" in h
+    assert ":BUS1:IIC:SCLK:THReshold 1.4" in h
+    assert ":BUS1:IIC:SDA:THReshold 1.4" in h
+    assert ":BUS1:IIC:ADDRess NORMal" in h
+    assert ":BUS1:FORMat HEX" in h
+    # Verified order: mode, then sources, then enable the decode row, then read.
+    assert (
+        h.index(":BUS1:MODE IIC")
+        < h.index(":BUS1:IIC:SCLK:SOURce D0")
+        < h.index(":BUS1:DISPlay ON")
+    )
+
+
+def test_decode_bus_non_i2c_with_i2c_fields_rejected() -> None:
+    sim = SimulatedTransport()
+    scope = establish(sim, reset_on_connect=False)
+    with pytest.raises(ValidationError):
+        scope.decode_bus(BusConfig(bus=1, protocol=BusProtocol.SPI, scl_source="D0"))
 
 
 # -- error checking -------------------------------------------------------

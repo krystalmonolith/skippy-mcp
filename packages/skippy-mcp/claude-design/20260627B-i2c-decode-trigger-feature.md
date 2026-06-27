@@ -23,6 +23,19 @@ candidate and checking `:SYSTem:ERRor?` (header error ⇒ wrong keyword). **Do n
 "clean up" the spellings — the decode and trigger subsystems are deliberately
 asymmetric on this firmware.**
 
+> **⚠ Hardware status (2026-06-27): serial decode is currently DISABLED on the
+> test unit.** The §2 tables confirm the sub-command *headers parse* — they do
+> NOT prove the scope enters a serial mode, and right now it does not.
+> `:BUS<n>:MODE IIC|SPI|RS232|CAN|LIN` is refused (`-200 "Command execute
+> failed"`, or silently ignored) and `:BUS<n>:MODE?` stays `PAR`; only
+> `:BUS<n>:MODE PARallel` (the license-free built-in) engages. The scope exposes
+> no option-listing SCPI (`*OPT?` / `:SYSTem:OPTion?` → `-100`), so the license
+> state is only visible on the front panel at **Utility → System → Help → Option
+> list**. This is the known MSO5000 pattern where a firmware update resets the
+> serial-decode entitlement (must be re-applied per firmware version). **Net:
+> Phase 1 is complete and simulator-validated; the live decode/trigger E2E (§4.1
+> Tier A/B) is gated on re-enabling the decode option.**
+
 ### 2.1 Decode (`:BUS<n>:…`, n ∈ {1,2})
 
 | Purpose | Command | Notes |
@@ -175,7 +188,7 @@ specific trigger conditions.
 | Phase | Scope |
 |---|---|
 | **0** ✅ | Pin exact MSO5000 I2C SCPI against the live scope (§2) |
-| **1** | `decode_bus` I2C config (sources + thresholds + address-mode + format) |
+| **1** ✅ (sim) | `decode_bus` I2C config (sources + thresholds + address-mode + format) — implemented + simulator-validated; live E2E gated on decode option (§2 status) |
 | **2** | I2C trigger (`mode=i2c` + when/address/data/direction/levels) |
 | **3** *(opt)* | Structured I2C frames (address, R/W, ack/nack, data bytes) in decode output |
 | **4** *(future)* | Same option/trigger pattern for SPI / UART / CAN |

@@ -16,8 +16,10 @@ from abc import ABC, abstractmethod
 
 from skippy_mcp.core.enums import (
     BandwidthLimit,
+    BusFormat,
     BusProtocol,
     Coupling,
+    I2cAddressMode,
     ImageFormat,
     MeasurementType,
     TriggerMode,
@@ -154,6 +156,24 @@ class Dialect(ABC):
         raise NotSupportedError("decode_bus", series=self.series, reason="no bus decode")
 
     def bus_decode_data(self, bus: int) -> str:
+        raise NotSupportedError("decode_bus", series=self.series, reason="no bus decode")
+
+    def bus_format(self, bus: int, fmt: BusFormat) -> str:
+        raise NotSupportedError("decode_bus", series=self.series, reason="no bus decode")
+
+    def bus_iic_scl_source(self, bus: int, source: str) -> str:
+        raise NotSupportedError("decode_bus", series=self.series, reason="no bus decode")
+
+    def bus_iic_sda_source(self, bus: int, source: str) -> str:
+        raise NotSupportedError("decode_bus", series=self.series, reason="no bus decode")
+
+    def bus_iic_scl_threshold(self, bus: int, threshold_v: float) -> str:
+        raise NotSupportedError("decode_bus", series=self.series, reason="no bus decode")
+
+    def bus_iic_sda_threshold(self, bus: int, threshold_v: float) -> str:
+        raise NotSupportedError("decode_bus", series=self.series, reason="no bus decode")
+
+    def bus_iic_address_mode(self, bus: int, mode: I2cAddressMode) -> str:
         raise NotSupportedError("decode_bus", series=self.series, reason="no bus decode")
 
 
