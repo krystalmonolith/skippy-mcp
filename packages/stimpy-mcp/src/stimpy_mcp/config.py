@@ -1,8 +1,9 @@
 """Server configuration and command-line parsing.
 
-StimpyMCP serves MCP over HTTP (Streamable HTTP) and drives GPIO via a local
-pigpio daemon. An optional JSON config file (``--config``) supplies the API key,
-TLS material, pin-map override, and pigpio coordinates; CLI flags win over it.
+StimpyMCP serves MCP over HTTP (Streamable HTTP) and drives GPIO via the kernel
+GPIO character device (lgpio -- no daemon). An optional JSON config file
+(``--config``) supplies the API key, TLS material, pin-map override, and the
+gpiochip number; CLI flags win over it.
 """
 
 from __future__ import annotations
@@ -26,8 +27,7 @@ JSON config file (--config). REQUIRED unless --simulate. "pin_map" is REQUIRED
     "pin_map": { "data": [4,5,...,26], "sync": 27 }, # REQUIRED: BCM pins D0..D15 + SYNC
     "api_key": "your-bearer-token",                 # require Bearer auth if set
     "tls": { "cert": "/path/cert.pem", "key": "/path/key.pem" },  # serve HTTPS if set
-    "pigpio_host": "localhost",                      # pigpiod address (default localhost)
-    "pigpio_port": 8888,                             # pigpiod port (default 8888)
+    "gpiochip": 0,                                   # /dev/gpiochipN to drive (default 0)
     "default_clock_rate_hz": 1000.0,                 # frame clock if a pattern omits one
     "allow_builtin_patterns": false,                 # register the gated load_counter tool
     "allowed_hosts": ["rigelpi:*"],                  # extra Host values to accept
@@ -39,7 +39,7 @@ With --simulate (no real GPIO), --config may be omitted and a reference pin map 
 """
 
 _ALLOWED_KEYS = {
-    "api_key", "tls", "pigpio_host", "pigpio_port", "default_clock_rate_hz",
+    "api_key", "tls", "gpiochip", "default_clock_rate_hz",
     "allow_builtin_patterns", "pin_map", "allowed_hosts", "allowed_origins",
 }
 _ALLOWED_TLS_KEYS = {"cert", "key"}
@@ -53,8 +53,7 @@ class ServerConfig:
 
     bind: str = "127.0.0.1"
     port: int = 8080
-    pigpio_host: str = "localhost"
-    pigpio_port: int = 8888
+    gpiochip: int = 0
     simulate: bool = False
     default_clock_rate_hz: float = 1000.0
     data_pins: tuple[int, ...] = rig_contract.DATA_PINS
@@ -92,10 +91,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--port", type=int, default=8080, help="HTTP port (default 8080).")
     parser.add_argument(
-        "--pigpio-host", default="localhost", help="pigpiod host (default localhost)."
-    )
-    parser.add_argument(
-        "--pigpio-port", type=int, default=8888, help="pigpiod port (default 8888)."
+        "--gpiochip", type=int, default=0, help="/dev/gpiochipN to drive (default 0)."
     )
     parser.add_argument(
         "--simulate", action="store_true",
@@ -275,20 +271,13 @@ def parse_args(argv: Sequence[str] | None = None) -> ServerConfig:
             inputs={"clock_rate": clock},
         )
 
-    pigpio_host = (
-        data.get("pigpio_host", "localhost") if ns.pigpio_host == "localhost" else ns.pigpio_host
-    )
-    pigpio_port = data.get("pigpio_port", 8888) if ns.pigpio_port == 8888 else ns.pigpio_port
-    if (
-        not isinstance(pigpio_port, int)
-        or isinstance(pigpio_port, bool)
-        or not 1 <= pigpio_port <= 65535
-    ):
+    gpiochip = data.get("gpiochip", 0) if ns.gpiochip == 0 else ns.gpiochip
+    if not isinstance(gpiochip, int) or isinstance(gpiochip, bool) or gpiochip < 0:
         raise ConfigError(
             "configure",
-            reason="pigpio_port must be an integer in 1..65535",
-            check="set pigpio_port to the pigpiod port (default 8888)",
-            inputs={"pigpio_port": pigpio_port},
+            reason="gpiochip must be a non-negative integer",
+            check="set gpiochip to the /dev/gpiochipN number (default 0)",
+            inputs={"gpiochip": gpiochip},
         )
 
     data_pins, sync_pin = _resolve_pin_map(data)
@@ -298,8 +287,7 @@ def parse_args(argv: Sequence[str] | None = None) -> ServerConfig:
     return ServerConfig(
         bind=str(ns.bind),
         port=int(ns.port),
-        pigpio_host=str(pigpio_host),
-        pigpio_port=int(pigpio_port),
+        gpiochip=int(gpiochip),
         simulate=bool(ns.simulate),
         default_clock_rate_hz=float(clock),
         data_pins=data_pins,

@@ -60,10 +60,10 @@ def test_cli_clock_beats_json(tmp_path: Path) -> None:
 
 
 def test_json_supplies_values(tmp_path: Path) -> None:
-    cfg = _cfg(tmp_path, api_key="secret", pigpio_port=9999)
+    cfg = _cfg(tmp_path, api_key="secret", gpiochip=4)
     c = parse_args(["--config", cfg])
     assert c.api_key == "secret"
-    assert c.pigpio_port == 9999
+    assert c.gpiochip == 4
 
 
 def test_comment_keys_ignored(tmp_path: Path) -> None:

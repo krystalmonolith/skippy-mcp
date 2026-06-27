@@ -2,7 +2,7 @@
 
 Validates tool inputs (actionable :class:`ValidationError`s before anything
 reaches the engine), builds :class:`Pattern`s, stages/swaps/stops, and reports
-status. Engine-agnostic: works against the simulator or pigpio identically.
+status. Engine-agnostic: works against the simulator or lgpio identically.
 """
 
 from __future__ import annotations
@@ -111,7 +111,7 @@ class StimulusDriver:
             # Surfaced here as validation; stage_pattern also enforces it authoritatively.
             raise ValidationError(
                 op, parameter="frames", value=len(frames),
-                requirement=f"<= {max_frames} frames (single-wave cap)",
+                requirement=f"<= {max_frames} frames (engine buffer cap)",
             )
         out: list[int] = []
         for i, w in enumerate(frames):

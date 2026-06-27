@@ -1,6 +1,6 @@
 """In-memory simulator engine — first-class, deterministic, no hardware.
 
-Models pigpio's behaviour (including the REPEAT_SYNC swap-at-loop-boundary) so
+Models the real engine's behaviour (including the swap-at-loop-boundary) so
 the driver, MCP, and tool layers run in CI with no Pi and no daemon. A *virtual
 clock* (advanced by :meth:`advance`) drives the emitted-frame counter, so tests
 assert "the staged buffer goes live on the next sync frame" deterministically.
@@ -20,7 +20,7 @@ from stimpy_mcp.core.models import (
     StagedHandle,
 )
 
-# Realistic pigpio numbers so the buffer-cap path is exercised in CI.
+# Realistic capacity numbers so the buffer-cap path is exercised in CI.
 _SIM_MAX_PULSES = 12000
 _SIM_MAX_CBS = 25600
 
@@ -141,7 +141,7 @@ class SimulatedEngine:
         )
 
     def limits(self) -> EngineLimits:
-        # One generic pulse ~ 2 CBs in pigpio; mirror the real engine's derivation.
+        # Mirror a real engine's capacity derivation so the cap is exercised.
         max_frames = min(_SIM_MAX_PULSES, _SIM_MAX_CBS // 2)
         return EngineLimits(
             max_pulses=_SIM_MAX_PULSES,

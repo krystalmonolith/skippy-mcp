@@ -5,14 +5,14 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "stimpy-mcp"
 version = "0.1.0"
-description = "An MCP server that drives a Raspberry Pi GPIO digital-stimulus generator via pigpio."
+description = "An MCP server that drives a Raspberry Pi GPIO digital-stimulus generator via lgpio."
 requires-python = ">=3.11"
 dependencies = [
     "rig-contract>=0.1.0",
     "mcp>=1.2.0",
     "starlette>=0.37",
     "uvicorn>=0.30",
-    "pigpio>=1.78",
+    "lgpio>=0.2.2",
 ]
 
 [project.optional-dependencies]
@@ -30,7 +30,7 @@ strict = true
 files = ["src"]
 
 [[tool.mypy.overrides]]
-module = ["pigpio", "mcp.*", "uvicorn.*"]
+module = ["lgpio", "mcp.*", "uvicorn.*"]
 ignore_missing_imports = true
 
 [tool.ruff]

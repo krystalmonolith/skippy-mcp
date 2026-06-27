@@ -1,7 +1,7 @@
 """Engine abstraction.
 
 Everything above this layer depends only on :class:`StimulusEngine`, never on
-pigpio. That keeps the driver and MCP layers testable against the in-memory
+lgpio. That keeps the driver and MCP layers testable against the in-memory
 :class:`~stimpy_mcp.engine.simulated.SimulatedEngine` with no Pi and no daemon.
 """
 
@@ -22,7 +22,7 @@ class StimulusEngine(Protocol):
         ...
 
     def stage_pattern(self, pattern: Pattern) -> StagedHandle:
-        """Build the device-side buffer (pigpio wave[s]) WITHOUT going live.
+        """Build the device-side frame buffer WITHOUT going live.
 
         Validates the pattern against :meth:`limits`; raises
         :class:`~stimpy_mcp.core.errors.BufferTooLargeError` if it will not fit.
@@ -46,7 +46,7 @@ class StimulusEngine(Protocol):
         ...
 
     def limits(self) -> EngineLimits:
-        """Device limits (max pulses/CBs, min tick, max frames per wave)."""
+        """Engine limits (capacity metrics, min tick, max frames per buffer)."""
         ...
 
     def close(self) -> None:

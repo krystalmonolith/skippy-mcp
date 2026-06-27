@@ -1,4 +1,4 @@
-"""Engine lifecycle: pick simulated vs pigpio, configure the pin map, build a driver."""
+"""Engine lifecycle: pick simulated vs lgpio, configure the pin map, build a driver."""
 
 from __future__ import annotations
 
@@ -9,14 +9,14 @@ from stimpy_mcp.engine.base import StimulusEngine
 
 
 def open_engine(config: ServerConfig) -> StimulusEngine:
-    """Open the real pigpio engine, or the in-memory simulator if ``--simulate``."""
+    """Open the real lgpio engine, or the in-memory simulator if ``--simulate``."""
     if config.simulate:
         from stimpy_mcp.engine.simulated import SimulatedEngine
 
         return SimulatedEngine()
-    from stimpy_mcp.engine.pigpio_engine import PigpioEngine
+    from stimpy_mcp.engine.lgpio_engine import LgpioEngine
 
-    return PigpioEngine(host=config.pigpio_host, port=config.pigpio_port)
+    return LgpioEngine(gpiochip=config.gpiochip)
 
 
 def establish(engine: StimulusEngine, config: ServerConfig) -> StimulusDriver:

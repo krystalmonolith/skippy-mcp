@@ -82,7 +82,7 @@ def test_buffer_cap_rejected() -> None:
     too_big = e.limits().max_frames_per_wave + 1
     with pytest.raises(BufferTooLargeError) as exc:
         e.stage_pattern(_pattern([0] * too_big))
-    assert "exceeds the single-wave limit" in str(exc.value)
+    assert "exceeds the engine cap" in str(exc.value)
 
 
 def test_stop_drives_idle_and_counts() -> None:

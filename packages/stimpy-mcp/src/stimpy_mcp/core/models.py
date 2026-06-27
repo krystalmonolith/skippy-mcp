@@ -32,7 +32,7 @@ class PinMap:
 
 
 def clock_to_tick_us(clock_rate_hz: float) -> int:
-    """Quantize a frame clock (Hz) to whole microseconds (pigpio's granularity).
+    """Quantize a frame clock (Hz) to whole microseconds (the tick granularity).
 
     Returns the per-frame dwell in microseconds, floored at 1 us.
     """
@@ -67,7 +67,13 @@ class Pattern:
 
 @dataclass(frozen=True, slots=True)
 class EngineLimits:
-    """Hardware/daemon limits, queried at startup (never hardcoded for real pigpio)."""
+    """Engine capacity/timing limits, reported by the active engine at startup.
+
+    ``max_pulses``/``max_cbs`` are engine-defined capacity metrics (DMA-derived for
+    pigpio historically; the software buffer cap for lgpio). ``min_tick_us`` is the
+    finest reliable per-frame dwell; ``max_frames_per_wave`` is the buffer cap a
+    single staged pattern may not exceed.
+    """
 
     max_pulses: int
     max_cbs: int
@@ -77,7 +83,7 @@ class EngineLimits:
 
 @dataclass(frozen=True, slots=True)
 class StagedHandle:
-    """Opaque reference to a device-side staged buffer (one or more pigpio waves)."""
+    """Opaque reference to a device-side staged frame buffer."""
 
     wave_ids: tuple[int, ...]
     frame_count: int

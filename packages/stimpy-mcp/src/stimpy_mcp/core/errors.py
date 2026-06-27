@@ -54,33 +54,31 @@ class ValidationError(StimpyError):
 
 
 class EngineUnavailableError(StimpyError):
-    """The GPIO engine (pigpio daemon) could not be reached."""
+    """The GPIO engine could not open the kernel GPIO character device (lgpio)."""
 
-    def __init__(self, *, host: str, port: int, reason: str) -> None:
+    def __init__(self, *, gpiochip: int, reason: str) -> None:
         super().__init__(
             "connect",
-            reason=f"could not connect to pigpiod at {host}:{port}: {reason}",
+            reason=f"could not open the GPIO engine on /dev/gpiochip{gpiochip}: {reason}",
             check=(
-                "(1) start the daemon: `sudo pigpiod -g -s 1` (or `systemctl start pigpiod`); "
-                "(2) verify pigpio_host/pigpio_port; (3) on a non-Pi host, run with --simulate"
+                f"(1) run on a Raspberry Pi with lgpio installed (`apt install python3-lgpio`); "
+                f"(2) ensure /dev/gpiochip{gpiochip} exists and the user is in the 'gpio' group; "
+                f"(3) on a non-Pi host, run with --simulate"
             ),
-            inputs={"pigpio_host": host, "pigpio_port": port},
+            inputs={"gpiochip": gpiochip},
         )
 
 
 class BufferTooLargeError(StimpyError):
-    """The uploaded pattern exceeds what a single pigpio wave can hold."""
+    """The uploaded pattern exceeds the engine's frame-buffer cap."""
 
     def __init__(self, *, frames: int, max_frames: int) -> None:
         super().__init__(
             "set_pattern",
-            reason=(
-                f"buffer of {frames} frames exceeds the single-wave limit of "
-                f"{max_frames} at this clock rate"
-            ),
+            reason=f"buffer of {frames} frames exceeds the engine cap of {max_frames}",
             check=(
-                f"reduce the buffer to <= {max_frames} frames, raise the pigpiod sample tick "
-                "(coarser timing), or wait for v2 wave-chaining"
+                f"reduce the buffer to <= {max_frames} frames, or split it across multiple "
+                "set_pattern calls"
             ),
             inputs={"frames": frames, "max_frames": max_frames},
         )

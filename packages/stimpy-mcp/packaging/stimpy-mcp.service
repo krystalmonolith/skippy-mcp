@@ -1,17 +1,19 @@
-# StimpyMCP server — unprivileged client of pigpiod.
+# StimpyMCP server — drives GPIO directly via the kernel chardev (lgpio, no daemon).
 # Install to /etc/systemd/system/stimpy-mcp.service, then:
 #   sudo systemctl enable --now stimpy-mcp
 # Edit User and the bind address/config path for your Pi.
 [Unit]
 Description=StimpyMCP GPIO digital-stimulus MCP server
-After=pigpiod.service network-online.target
-Requires=pigpiod.service
+After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
 User=stimpy
 Group=stimpy
+# lgpio talks to /dev/gpiochipN; the user must be in the 'gpio' group.
+SupplementaryGroups=gpio
+DeviceAllow=/dev/gpiochip0 rw
 # Bind the Pi's hotspot/LAN IP; api_key + TLS come from the config (mode 0600).
 ExecStart=/opt/stimpy-mcp/venv/bin/stimpy-mcp \
     --bind 192.168.137.74 \
@@ -19,7 +21,11 @@ ExecStart=/opt/stimpy-mcp/venv/bin/stimpy-mcp \
     --allow-builtin-patterns
 Restart=on-failure
 RestartSec=2
-# Hardening (the server needs no privileges; pigpiod owns the hardware):
+# Allow best-effort SCHED_FIFO pacing for low frame jitter (optional but recommended).
+AmbientCapabilities=CAP_SYS_NICE
+CapabilityBoundingSet=CAP_SYS_NICE
+LimitRTPRIO=20
+# Hardening (the server needs no other privileges):
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true

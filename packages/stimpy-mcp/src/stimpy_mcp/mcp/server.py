@@ -177,7 +177,7 @@ def build_banner(config: ServerConfig, n_tools: int) -> str:
     auth_line = "    -H 'Authorization: Bearer <your-api-key>' \\\n" if config.api_key else ""
     backend = (
         "SIMULATED" if config.simulate
-        else f"pigpio @ {config.pigpio_host}:{config.pigpio_port}"
+        else f"lgpio @ /dev/gpiochip{config.gpiochip}"
     )
     init = (
         '{"jsonrpc":"2.0","id":1,"method":"initialize","params":'
