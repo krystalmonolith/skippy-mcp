@@ -14,7 +14,13 @@ Group=stimpy
 # lgpio talks to /dev/gpiochipN; the user must be in the 'gpio' group.
 SupplementaryGroups=gpio
 DeviceAllow=/dev/gpiochip0 rw
-# Bind the Pi's hotspot/LAN IP; api_key + TLS come from the config (mode 0600).
+# REQUIRED: the lgpio Python module creates .lgd-nfy* notify FIFOs in its CWD on
+# import. A system service's default CWD is / (not writable) -> startup crash
+# ("xCreatePipe: Can't set permissions for //.lgd-nfy0"). Give it a writable,
+# service-private state dir (auto-created/owned by systemd, RW under ProtectSystem).
+StateDirectory=stimpy-mcp
+WorkingDirectory=/var/lib/stimpy-mcp
+# Bind the Pi's LAN IP; api_key (+ optional TLS) come from the config (mode 0600).
 ExecStart=/opt/stimpy-mcp/venv/bin/stimpy-mcp \
     --bind 192.168.137.74 \
     --config /etc/stimpy-mcp/config.json \
