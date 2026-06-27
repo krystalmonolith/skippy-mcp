@@ -28,7 +28,13 @@ between the pod and the Pi is mandatory.
 
 from __future__ import annotations
 
-__version__ = "0.1.0"
+from importlib.metadata import PackageNotFoundError, version
+
+try:
+    # Single source of truth: the installed distribution version (pyproject).
+    __version__ = version("rig-contract")
+except PackageNotFoundError:  # not installed (e.g. running straight from a source tree)
+    __version__ = "0+unknown"
 
 #: BCM GPIO line offsets on /dev/gpiochip0 (Pi 4 40-pin header), indexed by
 #: logic-pod channel: DATA_PINS[i] drives pod channel D<i>.

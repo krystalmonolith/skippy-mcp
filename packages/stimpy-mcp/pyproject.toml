@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stimpy-mcp"
-version = "0.1.0"
+version = "0.3.4"
 description = "An MCP server that drives a Raspberry Pi GPIO digital-stimulus generator via lgpio."
 requires-python = ">=3.11"
 dependencies = [

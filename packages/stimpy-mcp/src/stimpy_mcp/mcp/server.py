@@ -26,6 +26,7 @@ from starlette.responses import JSONResponse
 from starlette.routing import Mount
 from starlette.types import Receive, Scope, Send
 
+from stimpy_mcp import __version__
 from stimpy_mcp.config import ServerConfig
 from stimpy_mcp.core.errors import StimpyError
 from stimpy_mcp.driver.stimulus import StimulusDriver
@@ -47,7 +48,7 @@ def build_mcp_server(driver: StimulusDriver, specs: list[ToolSpec]) -> Server:
     All tool calls are serialized through a single lock: one engine session is
     not safe for concurrent staging/swapping.
     """
-    server: Server = Server("stimpy-mcp")
+    server: Server = Server("stimpy-mcp", version=__version__)
     by_name = {spec.name: spec for spec in specs}
     engine_lock = anyio.Lock()
 
@@ -170,8 +171,6 @@ def startup_warnings(config: ServerConfig) -> list[str]:
 
 def build_banner(config: ServerConfig, n_tools: int) -> str:
     """Human-readable startup banner describing the active mode + a smoke test."""
-    from stimpy_mcp import __version__
-
     endpoint = f"{config.scheme}://{config.bind}:{config.port}{MCP_PATH}"
     smoke_host = f"{config.scheme}://<host>:{config.port}{MCP_PATH}"
     auth_line = "    -H 'Authorization: Bearer <your-api-key>' \\\n" if config.api_key else ""
