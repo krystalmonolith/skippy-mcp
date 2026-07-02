@@ -149,8 +149,14 @@ Required arguments are **bold**. Enum values are the client-facing names.
 | `measure` | **`type`** (`vpp`/`vrms`/`freq`/`period`/`duty`/`rise`/`fall`/`delay`/`phase`), **`source`** (`CH1..CH4`), `source2` | `{type, source, value, unit}` |
 | `screenshot` | — | PNG image (MCP image content, base64) |
 | `read_waveform` | **`source`** (`CH1..CH4`/`D0..D15`), `mode` (`normal`/`raw`/`max`), `max_points` | `{source, x_unit, y_unit, x_increment, x_origin, values[]}` |
-| `decode_bus` | **`bus`** (1–2), **`protocol`** (`i2c`/`spi`/`uart`/`parallel`/`can`/`lin`), `config` | `{frames[]}` |
+| `decode_bus` | **`bus`** (1–2), **`protocol`** (`i2c`/`spi`/`uart`/`parallel`/`can`/`lin`), `scl_source`, `sda_source`, `scl_threshold_v`, `sda_threshold_v`, `address_mode` (`normal`/`rw`), `format` (`hex`/`dec`/`bin`/`ascii`), `config` | `{frames[]}` |
 | `scpi_raw` *(gated: `--allow-raw-scpi`)* | **`command`**, `expect_response` | `{response}` |
+
+> **Serial decode is still in development.** `decode_bus` accepts typed I2C
+> decoder configuration (sources, thresholds, address mode, display format) —
+> validated against the simulator, with live hardware validation pending. I2C
+> trigger support and structured frame parsing are scoped in the
+> [I2C decode/trigger design doc](claude-design/20260627B-i2c-decode-trigger-feature.md).
 
 ## Example MCP calls
 
@@ -256,6 +262,7 @@ The `arguments` object and the returned JSON for each tool:
 | [Implementation plan](claude-design/20260609B-skippy-mcp-implementation-plan.md) | Phased build plan (hardware-free through Phase 6). |
 | [Validation summary](claude-design/20260609C-skippy-mcp-validation-summary.md) | v0.1.0 test results + live MSO5204 validation. |
 | [HTTP transport design](claude-design/20260609D-skippy-mcp-http-transport-design.md) | HTTP transport, config file, API-key auth, TLS (v0.2.0). |
+| [I2C decode/trigger feature](claude-design/20260627B-i2c-decode-trigger-feature.md) | First-class I2C decode config + trigger: verified SCPI, phased plan, test-source rigs. **In development.** |
 
 ## License
 
