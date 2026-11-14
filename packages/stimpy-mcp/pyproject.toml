@@ -12,7 +12,7 @@ license = { file = "LICENSE" }
 authors = [{ name = "Mark Deazley" }]
 dependencies = [
     "rig-contract>=0.1.0",
-    "mcp>=1.2.0",
+    "mcp>=1.2.0,<2",  # 2.x is a breaking API rewrite (Server decorators, snake_case models)
     "starlette>=0.37",
     "uvicorn>=0.30",
     "lgpio>=0.2.2",

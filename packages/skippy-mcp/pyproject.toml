@@ -12,7 +12,7 @@ license = { file = "LICENSE" }
 authors = [{ name = "Mark Deazley" }]
 keywords = ["mcp", "scpi", "oscilloscope", "rigol", "pyvisa", "instrument"]
 dependencies = [
-    "mcp>=1.2.0",
+    "mcp>=1.2.0,<2",  # 2.x is a breaking API rewrite (Server decorators, snake_case models)
     "pyvisa>=1.14",
     "pyvisa-py>=0.7",
     "pillow>=10",
